@@ -1,17 +1,16 @@
-#!/bin/bash
+@echo off
 
-# Directory containing the m4a files
-DIR="CHANGE TO YOUR DIRECTORY"
+REM Directory containing the m4a files
+set DIR="C:\Users\A\Downloads\MediaHuman\Test"
 
-# Loop over each m4a file in the directory
-for FILE in "$DIR"/*.m4a
-do
-  # Get the base name of the file (without path and extension)
-  BASENAME=$(basename "$FILE" .m4a)
+REM Loop over each m4a file in the directory
+for %%F in (%DIR%\*.m4a) do (
+  REM Get the base name of the file (without path and extension)
+  for %%A in ("%%~nF") do set "BASENAME=%%~A"
 
-  # Output file name (appends "_trimmed" to original file name)
-  OUTPUT="$DIR/${BASENAME}_trimmed.m4a"
+  REM Output file name (appends "_trimmed" to original file name)
+  set OUTPUT="%DIR%\%BASENAME%_trimmed.m4a"
 
-  # Use ffmpeg to trim the audio to the first 30 minutes
-  ffmpeg -i "$FILE" -t 00:30:00 -c copy "$OUTPUT"
-done
+  REM Use ffmpeg to trim the audio to the first 30 minutes
+  ffmpeg -i "%%F" -t 00:30:00 -c copy %OUTPUT%
+)
