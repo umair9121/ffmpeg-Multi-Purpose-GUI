@@ -1,4 +1,4 @@
-# ffmpeg-script-for-auto-triming-multiple-files
+# ffmpeg-script-for-auto-trimming-multiple-files
 default is set to trim m4a audio for the first 30 minutes of all audio files
 
 Before you can use this script, make sure you have FFmpeg installed on your system:
