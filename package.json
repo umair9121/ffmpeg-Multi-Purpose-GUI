@@ -1,0 +1,30 @@
+{
+  "name": "ffmpeg-desktop-app",
+  "version": "1.0.0",
+  "description": "Desktop application for FFmpeg operations",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "mongodb": "^5.1.0"
+  },
+  "devDependencies": {
+    "electron": "^22.0.0",
+    "electron-builder": "^23.6.0"
+  },
+  "build": {
+    "appId": "com.yourname.ffmpeg-app",
+    "productName": "FFmpeg Desktop",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    }
+  }
+} 

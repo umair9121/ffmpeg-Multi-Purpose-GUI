@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>FFmpeg Desktop</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>FFmpeg Desktop</h1>
+    </header>
+    
+    <nav class="sidebar">
+      <button id="btn-trim" class="nav-button active">Trim Audio/Video</button>
+      <button id="btn-convert" class="nav-button">Convert Format</button>
+      <button id="btn-extract" class="nav-button">Extract Audio</button>
+      <button id="btn-merge" class="nav-button">Merge Media</button>
+      <button id="btn-presets" class="nav-button">Presets</button>
+      <button id="btn-history" class="nav-button">History</button>
+    </nav>
+    
+    <main class="content">
+      <section id="section-trim" class="section active">
+        <h2>Trim Audio/Video</h2>
+        
+        <div class="input-group">
+          <button id="select-files">Select Files</button>
+          <div id="selected-files" class="file-list"></div>
+        </div>
+        
+        <div class="input-group">
+          <label>Time Format:</label>
+          <select id="time-format">
+            <option value="seconds">Seconds</option>
+            <option value="timestamp" selected>Timestamp (HH:MM:SS)</option>
+          </select>
+        </div>
+        
+        <div class="input-group">
+          <label for="trim-start">Start Time:</label>
+          <input type="text" id="trim-start" placeholder="00:00:00">
+        </div>
+        
+        <div class="input-group">
+          <label for="trim-duration">Duration (or End Time):</label>
+          <input type="text" id="trim-duration" placeholder="00:30:00">
+          <select id="duration-type">
+            <option value="duration" selected>Duration</option>
+            <option value="end-time">End Time</option>
+          </select>
+        </div>
+        
+        <div class="input-group">
+          <label>Output Format:</label>
+          <select id="output-format">
+            <option value="same">Same as input</option>
+            <option value="mp3">MP3</option>
+            <option value="m4a">M4A</option>
+            <option value="wav">WAV</option>
+          </select>
+        </div>
+        
+        <div class="input-group">
+          <label for="output-suffix">Output Filename Suffix:</label>
+          <input type="text" id="output-suffix" value="_trimmed">
+        </div>
+        
+        <button id="start-trim" class="primary-button">Start Trimming</button>
+        
+        <div id="progress-container" class="hidden">
+          <progress id="progress-bar" max="100" value="0"></progress>
+          <div id="progress-text">0%</div>
+        </div>
+      </section>
+      
+      <!-- Other sections for different operations would go here -->
+    </main>
+  </div>
+  
+  <script src="renderer.js"></script>
+</body>
+</html> 
