@@ -1,7 +1,7 @@
 {
-  "name": "ffmpeg-desktop-app",
+  "name": "audio-multi-settings",
   "version": "1.0.0",
-  "description": "Desktop application for FFmpeg operations",
+  "description": "Desktop application for audio processing operations",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -13,7 +13,9 @@
   "dependencies": {
     "electron-store": "^8.1.0",
     "fluent-ffmpeg": "^2.1.2",
-    "mongodb": "^5.1.0"
+    "mongodb": "^5.1.0",
+    "electron-updater": "^6.1.1",
+    "electron-is-dev": "^2.0.0"
   },
   "devDependencies": {
     "electron": "^22.0.0",
@@ -21,7 +23,7 @@
   },
   "build": {
     "appId": "com.yourname.ffmpeg-app",
-    "productName": "FFmpeg Desktop",
+    "productName": "Audio Multi Settings",
     "extraResources": [
       {
         "from": "resources/ffmpeg",
