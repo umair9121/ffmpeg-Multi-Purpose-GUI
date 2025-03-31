@@ -3,6 +3,8 @@ const path = require('path');
 const ffmpegService = require('./services/ffmpeg');
 const dbService = require('./services/database');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
+const isDev = require('electron-is-dev');
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -29,6 +31,11 @@ app.whenReady().then(() => {
   
   // Connect to MongoDB
   dbService.connect();
+  
+  // Check for updates
+  if (!isDev) {
+    autoUpdater.checkForUpdatesAndNotify();
+  }
   
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
