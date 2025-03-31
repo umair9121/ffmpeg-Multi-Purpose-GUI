@@ -22,6 +22,12 @@
   "build": {
     "appId": "com.yourname.ffmpeg-app",
     "productName": "FFmpeg Desktop",
+    "extraResources": [
+      {
+        "from": "resources/ffmpeg",
+        "to": "ffmpeg"
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico"

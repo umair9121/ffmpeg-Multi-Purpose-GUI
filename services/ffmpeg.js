@@ -1,9 +1,15 @@
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
+const isDev = require('electron-is-dev');
 
-// Set ffmpeg path if needed (for packaged app)
-// ffmpeg.setFfmpegPath(path.join(process.resourcesPath, 'bin', 'ffmpeg.exe'));
+// Set ffmpeg path for production environment
+if (!isDev) {
+  const ffmpegPath = path.join(process.resourcesPath, 'ffmpeg', 'ffmpeg.exe');
+  const ffprobePath = path.join(process.resourcesPath, 'ffmpeg', 'ffprobe.exe');
+  ffmpeg.setFfmpegPath(ffmpegPath);
+  ffmpeg.setFfprobePath(ffprobePath);
+}
 
 const ffmpegService = {
   /**
