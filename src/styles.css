@@ -129,4 +129,46 @@ progress {
 #progress-text {
   text-align: center;
   margin-top: 0.5rem;
+}
+
+.directory-selector {
+  display: flex;
+  gap: 10px;
+}
+
+#directory-path {
+  flex-grow: 1;
+  background-color: #f8f9fa;
+}
+
+.file-selection-options {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.option-button {
+  flex: 1;
+}
+
+.filter-options {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 10px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.filter-options label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-weight: normal;
+}
+
+.filter-options input[type="checkbox"] {
+  width: auto;
+  margin: 0;
 } 

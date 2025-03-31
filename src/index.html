@@ -25,7 +25,25 @@
         <h2>Trim Audio/Video</h2>
         
         <div class="input-group">
-          <button id="select-files">Select Files</button>
+          <label for="directory-selection">Working Directory:</label>
+          <div class="directory-selector">
+            <input type="text" id="directory-path" placeholder="Select a directory" readonly>
+            <button id="select-directory">Browse</button>
+          </div>
+        </div>
+        
+        <div class="input-group">
+          <label>File Selection:</label>
+          <div class="file-selection-options">
+            <button id="select-files" class="option-button">Select Individual Files</button>
+            <button id="process-directory" class="option-button">Process All Files in Directory</button>
+          </div>
+          <div id="file-filters" class="filter-options">
+            <label><input type="checkbox" id="filter-m4a" checked> .m4a</label>
+            <label><input type="checkbox" id="filter-mp3"> .mp3</label>
+            <label><input type="checkbox" id="filter-wav"> .wav</label>
+            <label><input type="checkbox" id="filter-aac"> .aac</label>
+          </div>
           <div id="selected-files" class="file-list"></div>
         </div>
         

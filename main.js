@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const ffmpegService = require('./services/ffmpeg');
 const dbService = require('./services/database');
+const fs = require('fs');
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -57,6 +58,31 @@ ipcMain.handle('trim-audio', async (event, options) => {
   } catch (error) {
     console.error('Error trimming audio:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// Add this new IPC handler for directory selection
+ipcMain.handle('select-directory', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory']
+  });
+  
+  return result.filePaths[0];
+});
+
+// Add this handler to get files from a directory with specific extensions
+ipcMain.handle('get-directory-files', async (event, { directoryPath, extensions }) => {
+  try {
+    const files = fs.readdirSync(directoryPath);
+    return files
+      .filter(file => {
+        const ext = path.extname(file).toLowerCase();
+        return extensions.includes(ext);
+      })
+      .map(file => path.join(directoryPath, file));
+  } catch (error) {
+    console.error('Error reading directory:', error);
+    return [];
   }
 });
 

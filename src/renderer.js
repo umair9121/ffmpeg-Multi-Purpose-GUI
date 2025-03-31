@@ -11,8 +11,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const progressBar = document.getElementById('progress-bar');
   const progressText = document.getElementById('progress-text');
   
+  // Directory selection elements
+  const selectDirectoryBtn = document.getElementById('select-directory');
+  const directoryPathInput = document.getElementById('directory-path');
+  const processDirectoryBtn = document.getElementById('process-directory');
+  const fileFilters = document.getElementById('file-filters');
+  
   // Keep track of selected files
   let selectedFiles = [];
+  
+  let currentDirectoryPath = '';
   
   // Handle navigation
   navButtons.forEach(button => {
@@ -48,6 +56,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
+  // Handle directory selection
+  selectDirectoryBtn.addEventListener('click', async () => {
+    try {
+      const dirPath = await window.api.selectDirectory();
+      if (dirPath) {
+        currentDirectoryPath = dirPath;
+        directoryPathInput.value = dirPath;
+      }
+    } catch (error) {
+      console.error('Error selecting directory:', error);
+      alert('Error selecting directory: ' + error.message);
+    }
+  });
+  
   // Display selected files in the UI
   function displaySelectedFiles() {
     selectedFilesContainer.innerHTML = '';
@@ -77,6 +99,48 @@ document.addEventListener('DOMContentLoaded', () => {
     
     selectedFilesContainer.appendChild(list);
   }
+  
+  // Get selected file extensions for filtering
+  function getSelectedExtensions() {
+    const extensions = [];
+    if (document.getElementById('filter-m4a').checked) extensions.push('.m4a');
+    if (document.getElementById('filter-mp3').checked) extensions.push('.mp3');
+    if (document.getElementById('filter-wav').checked) extensions.push('.wav');
+    if (document.getElementById('filter-aac').checked) extensions.push('.aac');
+    return extensions;
+  }
+  
+  // Process all files in the selected directory
+  processDirectoryBtn.addEventListener('click', async () => {
+    if (!currentDirectoryPath) {
+      alert('Please select a directory first');
+      return;
+    }
+    
+    try {
+      const extensions = getSelectedExtensions();
+      if (extensions.length === 0) {
+        alert('Please select at least one file type');
+        return;
+      }
+      
+      const files = await window.api.getDirectoryFiles({
+        directoryPath: currentDirectoryPath,
+        extensions
+      });
+      
+      if (files.length === 0) {
+        alert(`No ${extensions.join(', ')} files found in the selected directory`);
+        return;
+      }
+      
+      selectedFiles = files;
+      displaySelectedFiles();
+    } catch (error) {
+      console.error('Error processing directory:', error);
+      alert('Error processing directory: ' + error.message);
+    }
+  });
   
   // Handle trim operation
   startTrimBtn.addEventListener('click', async () => {

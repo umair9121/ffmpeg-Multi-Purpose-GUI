@@ -60,6 +60,31 @@ const ffmpegService = {
     return results;
   },
   
+  /**
+   * Process files in a directory
+   * @param {Object} options - Processing options
+   * @param {string} options.directoryPath - Directory containing files
+   * @param {Array} options.extensions - File extensions to process
+   * @param {Function} options.processFunction - Function to process each file
+   * @returns {Promise<Array>} - Array of processed file results
+   */
+  processDirectory: async (options) => {
+    const { directoryPath, extensions, processFunction } = options;
+    
+    try {
+      const files = fs.readdirSync(directoryPath)
+        .filter(file => {
+          const ext = path.extname(file).toLowerCase();
+          return extensions.includes(ext);
+        })
+        .map(file => path.join(directoryPath, file));
+      
+      return await processFunction(files);
+    } catch (error) {
+      throw new Error(`Error processing directory: ${error.message}`);
+    }
+  },
+  
   // Add more FFmpeg operations here: convert, extract audio, merge, etc.
 };
 

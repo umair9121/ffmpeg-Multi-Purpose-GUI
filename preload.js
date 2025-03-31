@@ -14,5 +14,9 @@ contextBridge.exposeInMainWorld('api', {
   
   // Database operations
   savePreset: (preset) => ipcRenderer.invoke('save-preset', preset),
-  getPresets: () => ipcRenderer.invoke('get-presets')
+  getPresets: () => ipcRenderer.invoke('get-presets'),
+  
+  // Add these new methods
+  selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  getDirectoryFiles: (options) => ipcRenderer.invoke('get-directory-files', options)
 }); 
