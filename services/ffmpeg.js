@@ -81,17 +81,22 @@ const ffmpegService = {
    * @returns {Promise<Array>} - Array of output file paths
    */
   trimAudio: async (options) => {
-    const { files, startTime, duration, outputFormat, suffix } = options;
+    const { files, startTime, duration, outputFormat, suffix, outputDirectory } = options;
     const results = [];
     
     for (const file of files) {
       const inputExt = path.extname(file);
       const baseName = path.basename(file, inputExt);
       const dirName = path.dirname(file);
+      const targetDir = outputDirectory && outputDirectory.trim() !== '' ? outputDirectory : dirName;
+      
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
       
       // Determine output extension
       const outExt = outputFormat === 'same' ? inputExt : `.${outputFormat}`;
-      const outputPath = path.join(dirName, `${baseName}${suffix}${outExt}`);
+      const outputPath = path.join(targetDir, `${baseName}${suffix}${outExt}`);
       
       await new Promise((resolve, reject) => {
         let command = ffmpeg(file)

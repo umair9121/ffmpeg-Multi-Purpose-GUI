@@ -172,3 +172,38 @@ progress {
   width: auto;
   margin: 0;
 } 
+
+.output-directory-options {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+}
+
+.radio-option input[type="radio"] {
+  width: auto;
+  margin: 0;
+}
+
+.custom-output-selector {
+  margin-top: 0.5rem;
+}
+
+.custom-output-selector input {
+  flex: 1;
+  background-color: #f8f9fa;
+}
+
+.helper-text {
+  display: block;
+  margin-top: 0.5rem;
+  color: #4a5568;
+  font-size: 0.9rem;
+}

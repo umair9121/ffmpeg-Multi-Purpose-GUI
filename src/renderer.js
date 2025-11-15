@@ -16,11 +16,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const directoryPathInput = document.getElementById('directory-path');
   const processDirectoryBtn = document.getElementById('process-directory');
   const fileFilters = document.getElementById('file-filters');
+  const outputSameRadio = document.getElementById('output-same');
+  const outputCustomRadio = document.getElementById('output-custom');
+  const customOutputSelector = document.getElementById('custom-output-selector');
+  const selectOutputDirectoryBtn = document.getElementById('select-output-directory');
+  const customOutputPathInput = document.getElementById('custom-output-path');
   
   // Keep track of selected files
   let selectedFiles = [];
   
   let currentDirectoryPath = '';
+  let customOutputPath = '';
 
   // Listen for trim progress updates from the main process
   if (window.api && typeof window.api.onTrimProgress === 'function') {
@@ -78,6 +84,33 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Error selecting directory: ' + error.message);
     }
   });
+
+  function updateOutputDirectoryVisibility() {
+    if (outputCustomRadio.checked) {
+      customOutputSelector.classList.remove('hidden');
+    } else {
+      customOutputSelector.classList.add('hidden');
+    }
+  }
+
+  outputSameRadio.addEventListener('change', updateOutputDirectoryVisibility);
+  outputCustomRadio.addEventListener('change', updateOutputDirectoryVisibility);
+  updateOutputDirectoryVisibility();
+
+  if (selectOutputDirectoryBtn) {
+    selectOutputDirectoryBtn.addEventListener('click', async () => {
+      try {
+        const dirPath = await window.api.selectDirectory();
+        if (dirPath) {
+          customOutputPath = dirPath;
+          customOutputPathInput.value = dirPath;
+        }
+      } catch (error) {
+        console.error('Error selecting output directory:', error);
+        alert('Error selecting output directory: ' + error.message);
+      }
+    });
+  }
   
   // Display selected files in the UI
   function displaySelectedFiles() {
@@ -163,6 +196,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const durationType = document.getElementById('duration-type').value;
     const outputFormat = document.getElementById('output-format').value;
     const suffix = document.getElementById('output-suffix').value;
+    const useCustomOutput = outputCustomRadio.checked;
+    
+    if (useCustomOutput && !customOutputPath) {
+      alert('Please select an output directory when using custom output.');
+      return;
+    }
     
     // Calculate duration if using end time
     let duration = durationInput;
@@ -183,7 +222,8 @@ document.addEventListener('DOMContentLoaded', () => {
         startTime,
         duration,
         outputFormat,
-        suffix
+        suffix,
+        outputDirectory: useCustomOutput ? customOutputPath : null
       });
       
       if (!response?.success) {

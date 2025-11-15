@@ -83,6 +83,25 @@
           <label for="output-suffix">Output Filename Suffix:</label>
           <input type="text" id="output-suffix" value="_trimmed">
         </div>
+
+        <div class="input-group">
+          <label>Output Directory:</label>
+          <div class="output-directory-options">
+            <label class="radio-option">
+              <input type="radio" name="output-directory-mode" id="output-same" value="same" checked>
+              Use original file directory
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="output-directory-mode" id="output-custom" value="custom">
+              Use custom directory
+            </label>
+          </div>
+          <div class="directory-selector custom-output-selector hidden" id="custom-output-selector">
+            <input type="text" id="custom-output-path" placeholder="Select output directory" readonly>
+            <button id="select-output-directory">Browse</button>
+          </div>
+          <small class="helper-text">If no custom directory is selected, files will be stored alongside their sources.</small>
+        </div>
         
         <button id="start-trim" class="primary-button">Start Trimming</button>
         
