@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (dirPath) {
         currentDirectoryPath = dirPath;
         directoryPathInput.value = dirPath;
+        await loadDirectoryFiles(true);
       }
     } catch (error) {
       console.error('Error selecting directory:', error);
@@ -152,18 +153,21 @@ document.addEventListener('DOMContentLoaded', () => {
     return extensions;
   }
   
-  // Process all files in the selected directory
-  processDirectoryBtn.addEventListener('click', async () => {
+  async function loadDirectoryFiles(showErrors = false) {
     if (!currentDirectoryPath) {
-      alert('Please select a directory first');
-      return;
+      if (showErrors) {
+        alert('Please select a directory first');
+      }
+      return false;
     }
     
     try {
       const extensions = getSelectedExtensions();
       if (extensions.length === 0) {
-        alert('Please select at least one file type');
-        return;
+        if (showErrors) {
+          alert('Please select at least one file type');
+        }
+        return false;
       }
       
       const files = await window.api.getDirectoryFiles({
@@ -172,16 +176,27 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       if (files.length === 0) {
-        alert(`No ${extensions.join(', ')} files found in the selected directory`);
-        return;
+        if (showErrors) {
+          alert(`No ${extensions.join(', ')} files found in the selected directory`);
+        }
+        return false;
       }
       
       selectedFiles = files;
       displaySelectedFiles();
+      return true;
     } catch (error) {
       console.error('Error processing directory:', error);
-      alert('Error processing directory: ' + error.message);
+      if (showErrors) {
+        alert('Error processing directory: ' + error.message);
+      }
+      return false;
     }
+  }
+  
+  // Process all files in the selected directory
+  processDirectoryBtn.addEventListener('click', async () => {
+    await loadDirectoryFiles(true);
   });
   
   // Handle trim operation
