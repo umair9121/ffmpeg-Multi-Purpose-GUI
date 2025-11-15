@@ -1,14 +1,71 @@
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
-const isDev = require('electron-is-dev');
+const { execFile } = require('child_process');
+const ffmpegStatic = require('ffmpeg-static');
+const ffprobeStatic = require('ffprobe-static');
 
-// Set ffmpeg path for production environment
-if (!isDev) {
-  const ffmpegPath = path.join(process.resourcesPath, 'ffmpeg', 'ffmpeg.exe');
-  const ffprobePath = path.join(process.resourcesPath, 'ffmpeg', 'ffprobe.exe');
-  ffmpeg.setFfmpegPath(ffmpegPath);
-  ffmpeg.setFfprobePath(ffprobePath);
+let configured = false;
+let ffmpegSource = null;
+
+async function findSystemFfmpeg() {
+  return new Promise((resolve) => {
+    execFile('ffmpeg', ['-version'], (error) => {
+      if (error) {
+        resolve(null);
+      } else {
+        resolve('ffmpeg');
+      }
+    });
+  });
+}
+
+function configureWithStatic() {
+  if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
+    ffmpeg.setFfmpegPath(ffmpegStatic);
+    const ffprobePath = ffprobeStatic?.path || ffprobeStatic;
+    if (ffprobePath && fs.existsSync(ffprobePath)) {
+      ffmpeg.setFfprobePath(ffprobePath);
+    }
+    configured = true;
+    ffmpegSource = 'bundled';
+    return true;
+  }
+  return false;
+}
+
+async function ensureFfmpegAvailability() {
+  if (configured) {
+    return { available: true, source: ffmpegSource || 'cached' };
+  }
+  
+  // Try system ffmpeg first
+  const systemPath = await findSystemFfmpeg();
+  if (systemPath) {
+    ffmpeg.setFfmpegPath(systemPath);
+    const ffprobePath = await new Promise((resolve) => {
+      execFile('ffprobe', ['-version'], (error) => {
+        if (error) {
+          resolve(null);
+        } else {
+          resolve('ffprobe');
+        }
+      });
+    });
+    if (ffprobePath) {
+      ffmpeg.setFfprobePath(ffprobePath);
+    }
+    configured = true;
+    ffmpegSource = 'system';
+    return { available: true, source: 'system' };
+  }
+  
+  // Fall back to bundled static binaries
+  if (configureWithStatic()) {
+    return { available: true, source: 'bundled' };
+  }
+  
+  return { available: false, source: null };
 }
 
 const ffmpegService = {
@@ -94,4 +151,7 @@ const ffmpegService = {
   // Add more FFmpeg operations here: convert, extract audio, merge, etc.
 };
 
-module.exports = ffmpegService; 
+module.exports = {
+  ...ffmpegService,
+  ensureFfmpegAvailability
+};

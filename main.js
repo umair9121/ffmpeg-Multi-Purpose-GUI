@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const ffmpegService = require('./services/ffmpeg');
 const dbService = require('./services/database');
@@ -26,11 +26,56 @@ function createWindow() {
   // mainWindow.webContents.openDevTools();
 }
 
-app.whenReady().then(() => {
+async function ensureFfmpeg(mainWindow) {
+  const status = await ffmpegService.ensureFfmpegAvailability();
+  
+  if (!status.available) {
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      buttons: ['OK', 'Open Download Page'],
+      defaultId: 1,
+      cancelId: 0,
+      title: 'FFmpeg Required',
+      message: 'FFmpeg is required to process audio files, but it could not be installed automatically.',
+      detail: 'Click "Open Download Page" for instructions on installing FFmpeg manually.'
+    });
+    
+    if (result.response === 1) {
+      shell.openExternal('https://ffmpeg.org/download.html');
+    }
+    
+    return status;
+  }
+  
+  if (status.source === 'bundled') {
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      buttons: ['Continue', 'Install FFmpeg Manually'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Bundled FFmpeg Activated',
+      message: 'A bundled FFmpeg binary will be used because a system installation was not detected.',
+      detail: 'You can continue using the bundled version, or click "Install FFmpeg Manually" for setup instructions.'
+    });
+    
+    if (result.response === 1) {
+      shell.openExternal('https://ffmpeg.org/download.html');
+    }
+  }
+  
+  return status;
+}
+
+app.whenReady().then(async () => {
   createWindow();
   
   // Connect to MongoDB
   dbService.connect();
+  
+  // Ensure FFmpeg is available
+  if (mainWindow) {
+    await ensureFfmpeg(mainWindow);
+  }
   
   // Check for updates
   if (!isDev) {
@@ -60,7 +105,17 @@ ipcMain.handle('select-files', async () => {
 
 ipcMain.handle('trim-audio', async (event, options) => {
   try {
-    const results = await ffmpegService.trimAudio(options);
+    const results = await ffmpegService.trimAudio({
+      ...options,
+      onProgress: (file, percent) => {
+        if (mainWindow) {
+          mainWindow.webContents.send('trim-progress', {
+            file,
+            percent: typeof percent === 'number' ? percent : 0
+          });
+        }
+      }
+    });
     return { success: true, results };
   } catch (error) {
     console.error('Error trimming audio:', error);

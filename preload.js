@@ -11,12 +11,19 @@ contextBridge.exposeInMainWorld('api', {
   convertFormat: (options) => ipcRenderer.invoke('convert-format', options),
   extractAudio: (options) => ipcRenderer.invoke('extract-audio', options),
   mergeMedia: (options) => ipcRenderer.invoke('merge-media', options),
+  onTrimProgress: (callback) => {
+    ipcRenderer.on('trim-progress', (_event, data) => {
+      if (typeof callback === 'function') {
+        callback(data);
+      }
+    });
+  },
   
   // Database operations
   savePreset: (preset) => ipcRenderer.invoke('save-preset', preset),
   getPresets: () => ipcRenderer.invoke('get-presets'),
   
-  // Add these new methods
+  // Directory helpers
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   getDirectoryFiles: (options) => ipcRenderer.invoke('get-directory-files', options)
-}); 
+});

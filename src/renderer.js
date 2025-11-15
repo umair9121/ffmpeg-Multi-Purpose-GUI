@@ -21,6 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedFiles = [];
   
   let currentDirectoryPath = '';
+
+  // Listen for trim progress updates from the main process
+  if (window.api && typeof window.api.onTrimProgress === 'function') {
+    window.api.onTrimProgress(({ percent }) => {
+      const value = typeof percent === 'number' ? percent : 0;
+      progressBar.value = value;
+      progressText.textContent = `${Math.round(value)}%`;
+    });
+  }
   
   // Handle navigation
   navButtons.forEach(button => {
@@ -169,17 +178,19 @@ document.addEventListener('DOMContentLoaded', () => {
     progressText.textContent = '0%';
     
     try {
-      const results = await window.api.trimAudio({
+      const response = await window.api.trimAudio({
         files: selectedFiles,
         startTime,
         duration,
         outputFormat,
-        suffix,
-        onProgress: (file, percent) => {
-          progressBar.value = percent;
-          progressText.textContent = `${Math.round(percent)}%`;
-        }
+        suffix
       });
+      
+      if (!response?.success) {
+        throw new Error(response?.error || 'Unknown error while trimming files');
+      }
+      
+      const results = response.results || [];
       
       // Hide progress
       progressContainer.classList.add('hidden');
