@@ -18,6 +18,13 @@ contextBridge.exposeInMainWorld('api', {
       }
     });
   },
+  onConvertProgress: (callback) => {
+    ipcRenderer.on('convert-progress', (_event, data) => {
+      if (typeof callback === 'function') {
+        callback(data);
+      }
+    });
+  },
   
   // Database operations
   savePreset: (preset) => ipcRenderer.invoke('save-preset', preset),

@@ -10,6 +10,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const progressContainer = document.getElementById('progress-container');
   const progressBar = document.getElementById('progress-bar');
   const progressText = document.getElementById('progress-text');
+
+  // Convert section elements
+  const convertSelectFilesBtn = document.getElementById('convert-select-files');
+  const convertSelectedFilesContainer = document.getElementById('convert-selected-files');
+  const startConvertBtn = document.getElementById('start-convert');
+  const convertProgressContainer = document.getElementById('convert-progress-container');
+  const convertProgressBar = document.getElementById('convert-progress-bar');
+  const convertProgressText = document.getElementById('convert-progress-text');
+  const convertSelectDirectoryBtn = document.getElementById('convert-select-directory');
+  const convertDirectoryPathInput = document.getElementById('convert-directory-path');
+  const convertProcessDirectoryBtn = document.getElementById('convert-process-directory');
+  const convertOutputSameRadio = document.getElementById('convert-output-same');
+  const convertOutputCustomRadio = document.getElementById('convert-output-custom');
+  const convertCustomOutputSelector = document.getElementById('convert-custom-output-selector');
+  const convertSelectOutputDirectoryBtn = document.getElementById('convert-select-output-directory');
+  const convertCustomOutputPathInput = document.getElementById('convert-custom-output-path');
   
   // Directory selection elements
   const selectDirectoryBtn = document.getElementById('select-directory');
@@ -24,9 +40,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Keep track of selected files
   let selectedFiles = [];
+  let convertSelectedFiles = [];
   
   let currentDirectoryPath = '';
   let customOutputPath = '';
+  let convertDirectoryPath = '';
+  let convertCustomOutputPath = '';
 
   // Listen for trim progress updates from the main process
   if (window.api && typeof window.api.onTrimProgress === 'function') {
@@ -34,6 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const value = typeof percent === 'number' ? percent : 0;
       progressBar.value = value;
       progressText.textContent = `${Math.round(value)}%`;
+    });
+  }
+
+  if (window.api && typeof window.api.onConvertProgress === 'function') {
+    window.api.onConvertProgress(({ percent }) => {
+      const value = typeof percent === 'number' ? percent : 0;
+      convertProgressBar.value = value;
+      convertProgressText.textContent = `${Math.round(value)}%`;
     });
   }
   
@@ -70,6 +97,21 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Error selecting files: ' + error.message);
     }
   });
+
+  if (convertSelectFilesBtn) {
+    convertSelectFilesBtn.addEventListener('click', async () => {
+      try {
+        const files = await window.api.selectFiles();
+        if (files && files.length > 0) {
+          convertSelectedFiles = files;
+          displayConvertSelectedFiles();
+        }
+      } catch (error) {
+        console.error('Error selecting files for conversion:', error);
+        alert('Error selecting files: ' + error.message);
+      }
+    });
+  }
   
   // Handle directory selection
   selectDirectoryBtn.addEventListener('click', async () => {
@@ -85,6 +127,21 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Error selecting directory: ' + error.message);
     }
   });
+
+  if (convertSelectDirectoryBtn) {
+    convertSelectDirectoryBtn.addEventListener('click', async () => {
+      try {
+        const dirPath = await window.api.selectDirectory();
+        if (dirPath) {
+          convertDirectoryPath = dirPath;
+          convertDirectoryPathInput.value = dirPath;
+        }
+      } catch (error) {
+        console.error('Error selecting convert directory:', error);
+        alert('Error selecting directory: ' + error.message);
+      }
+    });
+  }
 
   function updateOutputDirectoryVisibility() {
     if (outputCustomRadio.checked) {
@@ -108,6 +165,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } catch (error) {
         console.error('Error selecting output directory:', error);
+        alert('Error selecting output directory: ' + error.message);
+      }
+    });
+  }
+
+  function updateConvertOutputDirectoryVisibility() {
+    if (!convertOutputSameRadio || !convertOutputCustomRadio || !convertCustomOutputSelector) {
+      return;
+    }
+
+    if (convertOutputCustomRadio.checked) {
+      convertCustomOutputSelector.classList.remove('hidden');
+    } else {
+      convertCustomOutputSelector.classList.add('hidden');
+    }
+  }
+
+  if (convertOutputSameRadio && convertOutputCustomRadio) {
+    convertOutputSameRadio.addEventListener('change', updateConvertOutputDirectoryVisibility);
+    convertOutputCustomRadio.addEventListener('change', updateConvertOutputDirectoryVisibility);
+    updateConvertOutputDirectoryVisibility();
+  }
+
+  if (convertSelectOutputDirectoryBtn) {
+    convertSelectOutputDirectoryBtn.addEventListener('click', async () => {
+      try {
+        const dirPath = await window.api.selectDirectory();
+        if (dirPath) {
+          convertCustomOutputPath = dirPath;
+          convertCustomOutputPathInput.value = dirPath;
+        }
+      } catch (error) {
+        console.error('Error selecting convert output directory:', error);
         alert('Error selecting output directory: ' + error.message);
       }
     });
@@ -142,6 +232,40 @@ document.addEventListener('DOMContentLoaded', () => {
     
     selectedFilesContainer.appendChild(list);
   }
+
+  function displayConvertSelectedFiles() {
+    if (!convertSelectedFilesContainer) {
+      return;
+    }
+
+    convertSelectedFilesContainer.innerHTML = '';
+
+    if (convertSelectedFiles.length === 0) {
+      convertSelectedFilesContainer.innerHTML = '<p>No files selected</p>';
+      return;
+    }
+
+    const list = document.createElement('ul');
+
+    convertSelectedFiles.forEach((file, index) => {
+      const item = document.createElement('li');
+      item.textContent = file;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.textContent = 'Remove';
+      removeBtn.classList.add('remove-file');
+      removeBtn.addEventListener('click', () => {
+        convertSelectedFiles.splice(index, 1);
+        displayConvertSelectedFiles();
+      });
+
+      item.appendChild(removeBtn);
+      list.appendChild(item);
+    });
+
+    convertSelectedFilesContainer.appendChild(list);
+  }
+  displayConvertSelectedFiles();
   
   // Get selected file extensions for filtering
   function getSelectedExtensions() {
@@ -150,6 +274,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('filter-mp3').checked) extensions.push('.mp3');
     if (document.getElementById('filter-wav').checked) extensions.push('.wav');
     if (document.getElementById('filter-aac').checked) extensions.push('.aac');
+    return extensions;
+  }
+
+  function getConvertSelectedExtensions() {
+    const extensions = [];
+    if (document.getElementById('convert-filter-m4a').checked) extensions.push('.m4a');
+    if (document.getElementById('convert-filter-mp3').checked) extensions.push('.mp3');
+    if (document.getElementById('convert-filter-wav').checked) extensions.push('.wav');
+    if (document.getElementById('convert-filter-aac').checked) extensions.push('.aac');
     return extensions;
   }
   
@@ -193,11 +326,58 @@ document.addEventListener('DOMContentLoaded', () => {
       return false;
     }
   }
+
+  async function loadConvertDirectoryFiles(showErrors = false) {
+    if (!convertDirectoryPath) {
+      if (showErrors) {
+        alert('Please select a directory first');
+      }
+      return false;
+    }
+
+    try {
+      const extensions = getConvertSelectedExtensions();
+      if (extensions.length === 0) {
+        if (showErrors) {
+          alert('Please select at least one file type');
+        }
+        return false;
+      }
+
+      const files = await window.api.getDirectoryFiles({
+        directoryPath: convertDirectoryPath,
+        extensions
+      });
+
+      if (files.length === 0) {
+        if (showErrors) {
+          alert(`No ${extensions.join(', ')} files found in the selected directory`);
+        }
+        return false;
+      }
+
+      convertSelectedFiles = files;
+      displayConvertSelectedFiles();
+      return true;
+    } catch (error) {
+      console.error('Error loading convert directory:', error);
+      if (showErrors) {
+        alert('Error processing directory: ' + error.message);
+      }
+      return false;
+    }
+  }
   
   // Process all files in the selected directory
   processDirectoryBtn.addEventListener('click', async () => {
     await loadDirectoryFiles(true);
   });
+
+  if (convertProcessDirectoryBtn) {
+    convertProcessDirectoryBtn.addEventListener('click', async () => {
+      await loadConvertDirectoryFiles(true);
+    });
+  }
   
   // Handle trim operation
   startTrimBtn.addEventListener('click', async () => {
@@ -258,4 +438,56 @@ document.addEventListener('DOMContentLoaded', () => {
       progressContainer.classList.add('hidden');
     }
   });
+
+  if (startConvertBtn) {
+    startConvertBtn.addEventListener('click', async () => {
+      if (convertSelectedFiles.length === 0) {
+        alert('Please select at least one file to convert');
+        return;
+      }
+
+      const targetFormat = document.getElementById('convert-target-format').value;
+      if (!targetFormat) {
+        alert('Please select a target format');
+        return;
+      }
+
+      const suffixInput = document.getElementById('convert-output-suffix').value;
+      const suffix = typeof suffixInput === 'string' ? suffixInput : '';
+      const useCustomOutput = convertOutputCustomRadio.checked;
+
+      if (useCustomOutput && !convertCustomOutputPath) {
+        alert('Please select an output directory when using custom output.');
+        return;
+      }
+
+      if (convertProgressContainer) {
+        convertProgressContainer.classList.remove('hidden');
+        convertProgressBar.value = 0;
+        convertProgressText.textContent = '0%';
+      }
+
+      try {
+        const response = await window.api.convertFormat({
+          files: convertSelectedFiles,
+          targetFormat,
+          suffix,
+          outputDirectory: useCustomOutput ? convertCustomOutputPath : null
+        });
+
+        if (!response?.success) {
+          throw new Error(response?.error || 'Unknown error while converting files');
+        }
+
+        alert(`Successfully converted ${response.results.length} files`);
+      } catch (error) {
+        console.error('Error converting files:', error);
+        alert('Error converting files: ' + error.message);
+      } finally {
+        if (convertProgressContainer) {
+          convertProgressContainer.classList.add('hidden');
+        }
+      }
+    });
+  }
 }); 

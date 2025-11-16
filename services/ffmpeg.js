@@ -7,6 +7,18 @@ const ffprobeStatic = require('ffprobe-static');
 
 let configured = false;
 let ffmpegSource = null;
+const SUPPORTED_CONVERSION_FORMATS = ['mp3', 'm4a', 'wav', 'aac'];
+
+const codecMap = {
+  mp3: 'libmp3lame',
+  m4a: 'aac',
+  aac: 'aac',
+  wav: 'pcm_s16le'
+};
+
+function resolveCodec(targetFormat) {
+  return codecMap[targetFormat] || null;
+}
 
 async function findSystemFfmpeg() {
   return new Promise((resolve) => {
@@ -125,6 +137,69 @@ const ffmpegService = {
       });
     }
     
+    return results;
+  },
+  /**
+   * Convert audio files to another format
+   * @param {Object} options
+   * @param {Array<string>} options.files
+   * @param {string} options.targetFormat
+   * @param {string} [options.suffix]
+   * @param {string|null} [options.outputDirectory]
+   * @param {Function} [options.onProgress]
+   * @returns {Promise<Array<string>>}
+   */
+  convertFormat: async (options) => {
+    const { files, targetFormat, suffix = '_converted', outputDirectory, onProgress } = options;
+
+    if (!Array.isArray(files) || files.length === 0) {
+      throw new Error('No files provided for conversion.');
+    }
+
+    if (!targetFormat || !SUPPORTED_CONVERSION_FORMATS.includes(targetFormat)) {
+      throw new Error('Unsupported target format.');
+    }
+
+    const results = [];
+
+    for (const file of files) {
+      const inputExt = path.extname(file);
+      const baseName = path.basename(file, inputExt);
+      const dirName = path.dirname(file);
+      const targetDir = outputDirectory && outputDirectory.trim() !== '' ? outputDirectory : dirName;
+
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      const sanitizedSuffix = typeof suffix === 'string' ? suffix : '';
+      const outputPath = path.join(targetDir, `${baseName}${sanitizedSuffix}.${targetFormat}`);
+
+      await new Promise((resolve, reject) => {
+        let command = ffmpeg(file).output(outputPath).toFormat(targetFormat);
+
+        const codec = resolveCodec(targetFormat);
+        if (codec) {
+          command = command.audioCodec(codec);
+        }
+
+        command
+          .on('progress', (progress) => {
+            if (onProgress) {
+              onProgress(file, progress.percent);
+            }
+          })
+          .on('end', () => {
+            results.push(outputPath);
+            resolve();
+          })
+          .on('error', (err) => {
+            reject(new Error(`Error converting ${file}: ${err.message}`));
+          })
+          .run();
+      });
+    }
+
     return results;
   },
   

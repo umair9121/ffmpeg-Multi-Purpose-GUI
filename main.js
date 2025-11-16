@@ -123,6 +123,26 @@ ipcMain.handle('trim-audio', async (event, options) => {
   }
 });
 
+ipcMain.handle('convert-format', async (event, options) => {
+  try {
+    const results = await ffmpegService.convertFormat({
+      ...options,
+      onProgress: (file, percent) => {
+        if (mainWindow) {
+          mainWindow.webContents.send('convert-progress', {
+            file,
+            percent: typeof percent === 'number' ? percent : 0
+          });
+        }
+      }
+    });
+    return { success: true, results };
+  } catch (error) {
+    console.error('Error converting files:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Add this new IPC handler for directory selection
 ipcMain.handle('select-directory', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {

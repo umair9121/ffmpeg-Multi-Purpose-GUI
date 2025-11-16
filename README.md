@@ -9,6 +9,7 @@ A desktop application for batch audio processing operations, built with Electron
 - **Flexible Output**: Choose same directory output or custom output locations
 - **Progress Tracking**: Real-time progress bars and status updates
 - **Multiple Audio Formats**: Support for MP3, M4A, WAV, FLAC, AAC files
+- **Format Conversion**: Convert batches of MP3, M4A, WAV, and AAC files to any of the other supported formats
 - **Automatic FFmpeg Handling**: Bundled FFmpeg binaries for easy setup
 - **Cross-platform**: Works on Windows, macOS, and Linux
 
@@ -64,6 +65,14 @@ The application will automatically handle FFmpeg installation. If FFmpeg is not 
 
 - **Same Directory**: Trimmed files are saved alongside originals with "_trimmed" suffix
 - **Custom Directory**: Choose a different output location for all processed files
+
+### Format Conversion
+
+1. Navigate to the **Convert Format** tab in the sidebar
+2. Select individual files or load every supported file in a directory
+3. Choose the desired target format (MP3, M4A, WAV, or AAC)
+4. Optional: set a custom suffix and destination directory
+5. Click **Start Conversion** to batch-convert the selected files
 
 ## Development
 
