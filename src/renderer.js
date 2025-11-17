@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const progressContainer = document.getElementById('progress-container');
   const progressBar = document.getElementById('progress-bar');
   const progressText = document.getElementById('progress-text');
-
+  
   // Convert section elements
   const convertSelectFilesBtn = document.getElementById('convert-select-files');
   const convertSelectedFilesContainer = document.getElementById('convert-selected-files');
@@ -64,6 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const mergeProgressContainer = document.getElementById('merge-progress-container');
   const mergeProgressBar = document.getElementById('merge-progress-bar');
   const mergeProgressText = document.getElementById('merge-progress-text');
+  const historyListContainer = document.getElementById('history-list');
+  const historyClearBtn = document.getElementById('history-clear');
   
   // Directory selection elements
   const selectDirectoryBtn = document.getElementById('select-directory');
@@ -81,6 +83,98 @@ document.addEventListener('DOMContentLoaded', () => {
   let convertSelectedFiles = [];
   let extractSelectedFiles = [];
   let mergeFiles = [];
+  let historyEntries = [];
+  const HISTORY_STORAGE_KEY = 'ffmpegDesktopHistoryLog';
+  const MAX_HISTORY_ENTRIES = 500;
+
+  function persistHistoryEntries() {
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(historyEntries));
+      }
+    } catch (error) {
+      console.warn('Unable to persist history entries:', error);
+    }
+  }
+
+  function loadHistoryEntries() {
+    try {
+      if (window.localStorage) {
+        const raw = window.localStorage.getItem(HISTORY_STORAGE_KEY);
+        historyEntries = raw ? JSON.parse(raw) : [];
+      } else {
+        historyEntries = [];
+      }
+    } catch (error) {
+      console.warn('Unable to load history entries:', error);
+      historyEntries = [];
+    }
+  }
+
+  function formatTimestamp(dateString) {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) {
+      return dateString;
+    }
+    return date.toLocaleString();
+  }
+
+  function renderHistoryEntries() {
+    if (!historyListContainer) {
+      return;
+    }
+
+    historyListContainer.innerHTML = '';
+
+    if (!historyEntries.length) {
+      historyListContainer.innerHTML = '<p>No history recorded yet.</p>';
+      return;
+    }
+
+    const list = document.createElement('ul');
+    historyEntries.forEach(entry => {
+      const item = document.createElement('li');
+      item.classList.add('history-item');
+
+      const message = document.createElement('div');
+      message.classList.add('history-item-message');
+      message.textContent = entry.message;
+
+      const timestamp = document.createElement('div');
+      timestamp.classList.add('history-item-timestamp');
+      timestamp.textContent = formatTimestamp(entry.timestamp);
+
+      item.appendChild(message);
+      item.appendChild(timestamp);
+      list.appendChild(item);
+    });
+
+    historyListContainer.appendChild(list);
+  }
+
+  function addHistoryEntry(message) {
+    if (!message || typeof message !== 'string') {
+      return;
+    }
+
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      message,
+      timestamp: new Date().toISOString()
+    };
+
+    historyEntries.unshift(entry);
+
+    if (historyEntries.length > MAX_HISTORY_ENTRIES) {
+      historyEntries = historyEntries.slice(0, MAX_HISTORY_ENTRIES);
+    }
+
+    persistHistoryEntries();
+    renderHistoryEntries();
+  }
+
+  loadHistoryEntries();
+  renderHistoryEntries();
   
   let currentDirectoryPath = '';
   let customOutputPath = '';
@@ -150,10 +244,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (files && files.length > 0) {
         selectedFiles = files;
         displaySelectedFiles();
+        addHistoryEntry(`Selected ${files.length} file(s) for trimming via file picker.`);
       }
     } catch (error) {
       console.error('Error selecting files:', error);
       alert('Error selecting files: ' + error.message);
+      addHistoryEntry(`Error selecting files for trimming: ${error.message}`);
     }
   });
 
@@ -164,10 +260,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (files && files.length > 0) {
           convertSelectedFiles = files;
           displayConvertSelectedFiles();
+          addHistoryEntry(`Selected ${files.length} file(s) for conversion via file picker.`);
         }
       } catch (error) {
         console.error('Error selecting files for conversion:', error);
         alert('Error selecting files: ' + error.message);
+        addHistoryEntry(`Error selecting files for conversion: ${error.message}`);
       }
     });
   }
@@ -179,10 +277,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (files && files.length > 0) {
           extractSelectedFiles = files;
           displayExtractSelectedFiles();
+          addHistoryEntry(`Selected ${files.length} file(s) for extraction via file picker.`);
         }
       } catch (error) {
         console.error('Error selecting files for extraction:', error);
         alert('Error selecting files: ' + error.message);
+        addHistoryEntry(`Error selecting files for extraction: ${error.message}`);
       }
     });
   }
@@ -191,15 +291,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!Array.isArray(newFiles)) {
       return;
     }
-    let added = false;
+    let addedCount = 0;
     newFiles.forEach(file => {
       if (typeof file === 'string' && file.trim() !== '' && !mergeFiles.includes(file)) {
         mergeFiles.push(file);
-        added = true;
+        addedCount += 1;
       }
     });
-    if (added) {
+    if (addedCount > 0) {
       displayMergeFiles();
+      addHistoryEntry(`Added ${addedCount} file(s) to the merge queue.`);
     }
   }
 
@@ -221,6 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
     mergeClearFilesBtn.addEventListener('click', () => {
       mergeFiles = [];
       displayMergeFiles();
+      addHistoryEntry('Cleared all files from the merge queue.');
     });
   }
 
@@ -253,6 +355,15 @@ document.addEventListener('DOMContentLoaded', () => {
       addMergeFiles(paths);
     });
   }
+
+  if (historyClearBtn) {
+    historyClearBtn.addEventListener('click', () => {
+      historyEntries = [];
+      persistHistoryEntries();
+      renderHistoryEntries();
+      addHistoryEntry('History cleared by user');
+    });
+  }
   
   // Handle directory selection
   selectDirectoryBtn.addEventListener('click', async () => {
@@ -261,11 +372,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (dirPath) {
         currentDirectoryPath = dirPath;
         directoryPathInput.value = dirPath;
+        addHistoryEntry(`Selected trim directory: ${dirPath}`);
         await loadDirectoryFiles(true);
       }
     } catch (error) {
       console.error('Error selecting directory:', error);
       alert('Error selecting directory: ' + error.message);
+      addHistoryEntry(`Error selecting trim directory: ${error.message}`);
     }
   });
 
@@ -276,10 +389,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dirPath) {
           convertDirectoryPath = dirPath;
           convertDirectoryPathInput.value = dirPath;
+          addHistoryEntry(`Selected convert directory: ${dirPath}`);
         }
       } catch (error) {
         console.error('Error selecting convert directory:', error);
         alert('Error selecting directory: ' + error.message);
+        addHistoryEntry(`Error selecting convert directory: ${error.message}`);
       }
     });
   }
@@ -291,10 +406,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dirPath) {
           extractDirectoryPath = dirPath;
           extractDirectoryPathInput.value = dirPath;
+          addHistoryEntry(`Selected extract directory: ${dirPath}`);
         }
       } catch (error) {
         console.error('Error selecting extract directory:', error);
         alert('Error selecting directory: ' + error.message);
+        addHistoryEntry(`Error selecting extract directory: ${error.message}`);
       }
     });
   }
@@ -318,10 +435,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dirPath) {
           customOutputPath = dirPath;
           customOutputPathInput.value = dirPath;
+          addHistoryEntry(`Set custom trim output directory: ${dirPath}`);
         }
       } catch (error) {
         console.error('Error selecting output directory:', error);
         alert('Error selecting output directory: ' + error.message);
+        addHistoryEntry(`Error selecting trim output directory: ${error.message}`);
       }
     });
   }
@@ -351,10 +470,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dirPath) {
           convertCustomOutputPath = dirPath;
           convertCustomOutputPathInput.value = dirPath;
+          addHistoryEntry(`Set custom convert output directory: ${dirPath}`);
         }
       } catch (error) {
         console.error('Error selecting convert output directory:', error);
         alert('Error selecting output directory: ' + error.message);
+        addHistoryEntry(`Error selecting convert output directory: ${error.message}`);
       }
     });
   }
@@ -384,10 +505,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dirPath) {
           extractCustomOutputPath = dirPath;
           extractCustomOutputPathInput.value = dirPath;
+          addHistoryEntry(`Set custom extract output directory: ${dirPath}`);
         }
       } catch (error) {
         console.error('Error selecting extract output directory:', error);
         alert('Error selecting output directory: ' + error.message);
+        addHistoryEntry(`Error selecting extract output directory: ${error.message}`);
       }
     });
   }
@@ -417,10 +540,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dirPath) {
           mergeCustomOutputPath = dirPath;
           mergeCustomOutputPathInput.value = dirPath;
+          addHistoryEntry(`Set custom merge output directory: ${dirPath}`);
         }
       } catch (error) {
         console.error('Error selecting merge output directory:', error);
         alert('Error selecting output directory: ' + error.message);
+        addHistoryEntry(`Error selecting merge output directory: ${error.message}`);
       }
     });
   }
@@ -557,6 +682,7 @@ document.addEventListener('DOMContentLoaded', () => {
           mergeFiles[index - 1] = mergeFiles[index];
           mergeFiles[index] = temp;
           displayMergeFiles();
+          addHistoryEntry(`Moved "${file}" up in the merge queue.`);
         }
       });
 
@@ -569,6 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
           mergeFiles[index + 1] = mergeFiles[index];
           mergeFiles[index] = temp;
           displayMergeFiles();
+          addHistoryEntry(`Moved "${file}" down in the merge queue.`);
         }
       });
 
@@ -577,6 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
       removeButton.addEventListener('click', () => {
         mergeFiles.splice(index, 1);
         displayMergeFiles();
+        addHistoryEntry(`Removed "${file}" from the merge queue.`);
       });
 
       actions.appendChild(upButton);
@@ -652,12 +780,14 @@ document.addEventListener('DOMContentLoaded', () => {
       
       selectedFiles = files;
       displaySelectedFiles();
+      addHistoryEntry(`Loaded ${files.length} file(s) for trimming from ${currentDirectoryPath || 'selected directory'} (${extensions.join(', ')})`);
       return true;
     } catch (error) {
       console.error('Error processing directory:', error);
       if (showErrors) {
         alert('Error processing directory: ' + error.message);
       }
+      addHistoryEntry(`Error loading trim directory: ${error.message}`);
       return false;
     }
   }
@@ -693,12 +823,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       convertSelectedFiles = files;
       displayConvertSelectedFiles();
+      addHistoryEntry(`Loaded ${files.length} file(s) for conversion from ${convertDirectoryPath || 'selected directory'} (${extensions.join(', ')})`);
       return true;
     } catch (error) {
       console.error('Error loading convert directory:', error);
       if (showErrors) {
         alert('Error processing directory: ' + error.message);
       }
+      addHistoryEntry(`Error loading convert directory: ${error.message}`);
       return false;
     }
   }
@@ -734,12 +866,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       extractSelectedFiles = files;
       displayExtractSelectedFiles();
+      addHistoryEntry(`Loaded ${files.length} file(s) for extraction from ${extractDirectoryPath || 'selected directory'} (${extensions.join(', ')})`);
       return true;
     } catch (error) {
       console.error('Error loading extract directory:', error);
       if (showErrors) {
         alert('Error processing directory: ' + error.message);
       }
+      addHistoryEntry(`Error loading extract directory: ${error.message}`);
       return false;
     }
   }
@@ -855,10 +989,12 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Show success message
       alert(`Successfully processed ${results.length} files`);
+      addHistoryEntry(`Trimmed ${results.length} file(s) starting at ${startTime} for duration ${duration}. Output format: ${outputFormat}, suffix: ${suffix}.`);
     } catch (error) {
       console.error('Error trimming files:', error);
       alert('Error trimming files: ' + error.message);
       progressContainer.classList.add('hidden');
+      addHistoryEntry(`Error trimming files: ${error.message}`);
     }
   });
 
@@ -903,9 +1039,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         alert(`Successfully converted ${response.results.length} files`);
+        addHistoryEntry(`Converted ${response.results.length} file(s) to ${targetFormat}.`);
       } catch (error) {
         console.error('Error converting files:', error);
         alert('Error converting files: ' + error.message);
+        addHistoryEntry(`Error converting files: ${error.message}`);
       } finally {
         if (convertProgressContainer) {
           convertProgressContainer.classList.add('hidden');
@@ -1004,9 +1142,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         alert(`Successfully extracted audio from ${response.results.length} files`);
+        addHistoryEntry(`Extracted audio from ${response.results.length} file(s) (${startTime} - ${endTimeInput}). Output format: ${outputFormat}.`);
       } catch (error) {
         console.error('Error extracting audio:', error);
         alert('Error extracting audio: ' + error.message);
+        addHistoryEntry(`Error extracting audio: ${error.message}`);
       } finally {
         if (extractProgressContainer) {
           extractProgressContainer.classList.add('hidden');
@@ -1070,9 +1210,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         alert(`Successfully merged files into ${response.results[0]}`);
+        addHistoryEntry(`Merged ${mergeFiles.length} file(s) into ${response.results[0]} using format ${outputFormat}.`);
       } catch (error) {
         console.error('Error merging files:', error);
         alert('Error merging files: ' + error.message);
+        addHistoryEntry(`Error merging files: ${error.message}`);
       } finally {
         if (mergeProgressContainer) {
           mergeProgressContainer.classList.add('hidden');
