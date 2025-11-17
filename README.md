@@ -12,6 +12,7 @@ A desktop application for batch audio processing operations, built with Electron
 - **Format Conversion**: Convert batches of MP3, M4A, WAV, and AAC files to any of the other supported formats
 - **Audio Extraction**: Extract precise segments from one file or entire folders with start/end timestamps, stream-copy mode, and advanced audio controls
 - **Merge Media**: Drag-and-drop multiple audio clips, reorder them visually, and merge with optional stream copy or re-encoding controls
+- **History/Logs**: Automatically track every change locally so you can review what happened at any time
 - **Automatic FFmpeg Handling**: Bundled FFmpeg binaries for easy setup
 - **Cross-platform**: Works on Windows, macOS, and Linux
 
@@ -96,6 +97,13 @@ The application will automatically handle FFmpeg installation. If FFmpeg is not 
 5. Choose **Copy original stream** to attempt a fast `-c copy` merge when all files share the same codec/container
 6. Set an output suffix and directory preference
 7. Click **Merge Audio** to concatenate every file into a single track
+
+### History / Logs
+
+1. Visit the **History/Logs** tab to review all actions performed in the app
+2. Entries are added automatically whenever you change settings, select files, or run operations
+3. Use **Clear History** to reset the log if desired (a new entry will note the clear action)
+4. **Note:** The full history stays on your device only and is not transmitted anywhere
 
 ## Development
 
