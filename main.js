@@ -163,6 +163,26 @@ ipcMain.handle('extract-audio', async (event, options) => {
   }
 });
 
+ipcMain.handle('merge-media', async (event, options) => {
+  try {
+    const results = await ffmpegService.mergeMedia({
+      ...options,
+      onProgress: (file, percent) => {
+        if (mainWindow) {
+          mainWindow.webContents.send('merge-progress', {
+            file,
+            percent: typeof percent === 'number' ? percent : 0
+          });
+        }
+      }
+    });
+    return { success: true, results };
+  } catch (error) {
+    console.error('Error merging media:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Add this new IPC handler for directory selection
 ipcMain.handle('select-directory', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {

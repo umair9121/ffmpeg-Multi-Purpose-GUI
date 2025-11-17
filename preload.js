@@ -32,6 +32,13 @@ contextBridge.exposeInMainWorld('api', {
       }
     });
   },
+  onMergeProgress: (callback) => {
+    ipcRenderer.on('merge-progress', (_event, data) => {
+      if (typeof callback === 'function') {
+        callback(data);
+      }
+    });
+  },
   
   // Database operations
   savePreset: (preset) => ipcRenderer.invoke('save-preset', preset),

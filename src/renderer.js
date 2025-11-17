@@ -42,6 +42,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const extractCustomOutputSelector = document.getElementById('extract-custom-output-selector');
   const extractSelectOutputDirectoryBtn = document.getElementById('extract-select-output-directory');
   const extractCustomOutputPathInput = document.getElementById('extract-custom-output-path');
+
+  // Merge section elements
+  const mergeDropZone = document.getElementById('merge-drop-zone');
+  const mergeAddFilesBtn = document.getElementById('merge-add-files');
+  const mergeClearFilesBtn = document.getElementById('merge-clear-files');
+  const mergeFileListContainer = document.getElementById('merge-file-list');
+  const mergeOutputFormatSelect = document.getElementById('merge-output-format');
+  const mergeAudioCodecSelect = document.getElementById('merge-audio-codec');
+  const mergeBitrateInput = document.getElementById('merge-bitrate');
+  const mergeSampleRateInput = document.getElementById('merge-sample-rate');
+  const mergeChannelsInput = document.getElementById('merge-channels');
+  const mergeFiltersInput = document.getElementById('merge-filters');
+  const mergeOutputSuffixInput = document.getElementById('merge-output-suffix');
+  const mergeOutputSameRadio = document.getElementById('merge-output-same');
+  const mergeOutputCustomRadio = document.getElementById('merge-output-custom');
+  const mergeCustomOutputSelector = document.getElementById('merge-custom-output-selector');
+  const mergeCustomOutputPathInput = document.getElementById('merge-custom-output-path');
+  const mergeSelectOutputDirectoryBtn = document.getElementById('merge-select-output-directory');
+  const startMergeBtn = document.getElementById('start-merge');
+  const mergeProgressContainer = document.getElementById('merge-progress-container');
+  const mergeProgressBar = document.getElementById('merge-progress-bar');
+  const mergeProgressText = document.getElementById('merge-progress-text');
   
   // Directory selection elements
   const selectDirectoryBtn = document.getElementById('select-directory');
@@ -58,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedFiles = [];
   let convertSelectedFiles = [];
   let extractSelectedFiles = [];
+  let mergeFiles = [];
   
   let currentDirectoryPath = '';
   let customOutputPath = '';
@@ -65,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let convertCustomOutputPath = '';
   let extractDirectoryPath = '';
   let extractCustomOutputPath = '';
+  let mergeCustomOutputPath = '';
 
   // Listen for trim progress updates from the main process
   if (window.api && typeof window.api.onTrimProgress === 'function') {
@@ -88,6 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const value = typeof percent === 'number' ? percent : 0;
       extractProgressBar.value = value;
       extractProgressText.textContent = `${Math.round(value)}%`;
+    });
+  }
+
+  if (window.api && typeof window.api.onMergeProgress === 'function') {
+    window.api.onMergeProgress(({ percent }) => {
+      const value = typeof percent === 'number' ? percent : 0;
+      mergeProgressBar.value = value;
+      mergeProgressText.textContent = `${Math.round(value)}%`;
     });
   }
   
@@ -152,6 +184,73 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Error selecting files for extraction:', error);
         alert('Error selecting files: ' + error.message);
       }
+    });
+  }
+
+  function addMergeFiles(newFiles) {
+    if (!Array.isArray(newFiles)) {
+      return;
+    }
+    let added = false;
+    newFiles.forEach(file => {
+      if (typeof file === 'string' && file.trim() !== '' && !mergeFiles.includes(file)) {
+        mergeFiles.push(file);
+        added = true;
+      }
+    });
+    if (added) {
+      displayMergeFiles();
+    }
+  }
+
+  if (mergeAddFilesBtn) {
+    mergeAddFilesBtn.addEventListener('click', async () => {
+      try {
+        const files = await window.api.selectFiles();
+        if (files && files.length > 0) {
+          addMergeFiles(files);
+        }
+      } catch (error) {
+        console.error('Error selecting files for merge:', error);
+        alert('Error selecting files: ' + error.message);
+      }
+    });
+  }
+
+  if (mergeClearFilesBtn) {
+    mergeClearFilesBtn.addEventListener('click', () => {
+      mergeFiles = [];
+      displayMergeFiles();
+    });
+  }
+
+  if (mergeDropZone) {
+    const handleDragOver = (event) => {
+      event.preventDefault();
+      mergeDropZone.classList.add('dragover');
+    };
+
+    const handleDragLeave = (event) => {
+      event.preventDefault();
+      mergeDropZone.classList.remove('dragover');
+    };
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      mergeDropZone.addEventListener(evt, handleDragOver);
+    });
+
+    ['dragleave', 'dragend'].forEach(evt => {
+      mergeDropZone.addEventListener(evt, handleDragLeave);
+    });
+
+    mergeDropZone.addEventListener('drop', (event) => {
+      event.preventDefault();
+      mergeDropZone.classList.remove('dragover');
+      const fileList = Array.from(event.dataTransfer?.files || []);
+      const paths = fileList
+        .map(file => file.path || file.name)
+        .filter(Boolean);
+      addMergeFiles(paths);
     });
   }
   
@@ -292,6 +391,39 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  function updateMergeOutputDirectoryVisibility() {
+    if (!mergeOutputSameRadio || !mergeOutputCustomRadio || !mergeCustomOutputSelector) {
+      return;
+    }
+
+    if (mergeOutputCustomRadio.checked) {
+      mergeCustomOutputSelector.classList.remove('hidden');
+    } else {
+      mergeCustomOutputSelector.classList.add('hidden');
+    }
+  }
+
+  if (mergeOutputSameRadio && mergeOutputCustomRadio) {
+    mergeOutputSameRadio.addEventListener('change', updateMergeOutputDirectoryVisibility);
+    mergeOutputCustomRadio.addEventListener('change', updateMergeOutputDirectoryVisibility);
+    updateMergeOutputDirectoryVisibility();
+  }
+
+  if (mergeSelectOutputDirectoryBtn) {
+    mergeSelectOutputDirectoryBtn.addEventListener('click', async () => {
+      try {
+        const dirPath = await window.api.selectDirectory();
+        if (dirPath) {
+          mergeCustomOutputPath = dirPath;
+          mergeCustomOutputPathInput.value = dirPath;
+        }
+      } catch (error) {
+        console.error('Error selecting merge output directory:', error);
+        alert('Error selecting output directory: ' + error.message);
+      }
+    });
+  }
   
   // Display selected files in the UI
   function displaySelectedFiles() {
@@ -390,6 +522,75 @@ document.addEventListener('DOMContentLoaded', () => {
     extractSelectedFilesContainer.appendChild(list);
   }
   displayExtractSelectedFiles();
+
+  function displayMergeFiles() {
+    if (!mergeFileListContainer) {
+      return;
+    }
+
+    mergeFileListContainer.innerHTML = '';
+
+    if (mergeFiles.length === 0) {
+      mergeFileListContainer.innerHTML = '<p>No files selected</p>';
+      return;
+    }
+
+    const list = document.createElement('ul');
+
+    mergeFiles.forEach((file, index) => {
+      const item = document.createElement('li');
+      item.classList.add('merge-file-item');
+
+      const info = document.createElement('div');
+      info.classList.add('merge-file-info');
+      info.textContent = file;
+
+      const actions = document.createElement('div');
+      actions.classList.add('merge-file-actions');
+
+      const upButton = document.createElement('button');
+      upButton.textContent = 'Up';
+      upButton.disabled = index === 0;
+      upButton.addEventListener('click', () => {
+        if (index > 0) {
+          const temp = mergeFiles[index - 1];
+          mergeFiles[index - 1] = mergeFiles[index];
+          mergeFiles[index] = temp;
+          displayMergeFiles();
+        }
+      });
+
+      const downButton = document.createElement('button');
+      downButton.textContent = 'Down';
+      downButton.disabled = index === mergeFiles.length - 1;
+      downButton.addEventListener('click', () => {
+        if (index < mergeFiles.length - 1) {
+          const temp = mergeFiles[index + 1];
+          mergeFiles[index + 1] = mergeFiles[index];
+          mergeFiles[index] = temp;
+          displayMergeFiles();
+        }
+      });
+
+      const removeButton = document.createElement('button');
+      removeButton.textContent = 'Remove';
+      removeButton.addEventListener('click', () => {
+        mergeFiles.splice(index, 1);
+        displayMergeFiles();
+      });
+
+      actions.appendChild(upButton);
+      actions.appendChild(downButton);
+      actions.appendChild(removeButton);
+
+      item.appendChild(info);
+      item.appendChild(actions);
+      list.appendChild(item);
+    });
+
+    mergeFileListContainer.appendChild(list);
+  }
+  displayMergeFiles();
   
   // Get selected file extensions for filtering
   function getSelectedExtensions() {
@@ -809,6 +1010,72 @@ document.addEventListener('DOMContentLoaded', () => {
       } finally {
         if (extractProgressContainer) {
           extractProgressContainer.classList.add('hidden');
+        }
+      }
+    });
+  }
+
+  if (startMergeBtn) {
+    startMergeBtn.addEventListener('click', async () => {
+      if (mergeFiles.length < 2) {
+        alert('Please add at least two files to merge');
+        return;
+      }
+
+      const outputFormat = mergeOutputFormatSelect ? mergeOutputFormatSelect.value : 'mp3';
+      if (!outputFormat) {
+        alert('Please select an output format');
+        return;
+      }
+
+      const audioCodec = mergeAudioCodecSelect ? mergeAudioCodecSelect.value : 'auto';
+      const audioBitrateRaw = mergeBitrateInput ? mergeBitrateInput.value.trim() : '';
+      const sampleRateRaw = mergeSampleRateInput ? mergeSampleRateInput.value.trim() : '';
+      const channelsRaw = mergeChannelsInput ? mergeChannelsInput.value.trim() : '';
+      const audioFilters = mergeFiltersInput ? mergeFiltersInput.value.trim() : '';
+
+      const sampleRate = sampleRateRaw !== '' && !Number.isNaN(Number(sampleRateRaw)) ? Number(sampleRateRaw) : null;
+      const channels = channelsRaw !== '' && !Number.isNaN(Number(channelsRaw)) ? Number(channelsRaw) : null;
+
+      const suffixInput = mergeOutputSuffixInput ? mergeOutputSuffixInput.value : '';
+      const suffix = typeof suffixInput === 'string' ? suffixInput : '';
+
+      const useCustomOutput = mergeOutputCustomRadio && mergeOutputCustomRadio.checked;
+      if (useCustomOutput && !mergeCustomOutputPath) {
+        alert('Please select an output directory when using custom output.');
+        return;
+      }
+
+      if (mergeProgressContainer) {
+        mergeProgressContainer.classList.remove('hidden');
+        mergeProgressBar.value = 0;
+        mergeProgressText.textContent = '0%';
+      }
+
+      try {
+        const response = await window.api.mergeMedia({
+          files: mergeFiles,
+          outputFormat,
+          suffix,
+          outputDirectory: useCustomOutput ? mergeCustomOutputPath : null,
+          audioCodec,
+          audioBitrate: audioBitrateRaw || null,
+          sampleRate,
+          channels,
+          audioFilters: audioFilters || null
+        });
+
+        if (!response?.success) {
+          throw new Error(response?.error || 'Unknown error while merging files');
+        }
+
+        alert(`Successfully merged files into ${response.results[0]}`);
+      } catch (error) {
+        console.error('Error merging files:', error);
+        alert('Error merging files: ' + error.message);
+      } finally {
+        if (mergeProgressContainer) {
+          mergeProgressContainer.classList.add('hidden');
         }
       }
     });

@@ -1,6 +1,7 @@
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { execFile } = require('child_process');
 const ffmpegStatic = require('ffmpeg-static');
 const ffprobeStatic = require('ffprobe-static');
@@ -43,6 +44,38 @@ function toPositiveInteger(value) {
     return null;
   }
   return Math.floor(parsed);
+}
+
+function createConcatListFile(files) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ffmerge-'));
+  const listPath = path.join(tmpDir, 'files.txt');
+  const content = files
+    .map(file => {
+      const escaped = file.replace(/'/g, "'\\''");
+      return `file '${escaped}'`;
+    })
+    .join('\n');
+  fs.writeFileSync(listPath, content, 'utf8');
+  return { tmpDir, listPath };
+}
+
+function cleanupConcatList(tempResources) {
+  if (!tempResources) return;
+  const { listPath, tmpDir } = tempResources;
+  try {
+    if (listPath && fs.existsSync(listPath)) {
+      fs.unlinkSync(listPath);
+    }
+  } catch (error) {
+    console.warn('Unable to remove temporary concat list file:', error);
+  }
+  try {
+    if (tmpDir && fs.existsSync(tmpDir)) {
+      fs.rmdirSync(tmpDir);
+    }
+  } catch (error) {
+    console.warn('Unable to remove temporary concat directory:', error);
+  }
 }
 
 async function findSystemFfmpeg() {
@@ -349,6 +382,164 @@ const ffmpegService = {
           })
           .on('error', (err) => {
             reject(new Error(`Error extracting audio from ${file}: ${err.message}`));
+          })
+          .run();
+      });
+    }
+
+    return results;
+  },
+
+  /**
+   * Merge multiple audio files sequentially
+   * @param {Object} options
+   * @param {Array<string>} options.files
+   * @param {string} options.outputFormat
+   * @param {string} [options.suffix]
+   * @param {string|null} [options.outputDirectory]
+   * @param {Function} [options.onProgress]
+   * @param {string} [options.audioCodec]
+   * @param {string|number} [options.audioBitrate]
+   * @param {number} [options.sampleRate]
+   * @param {number} [options.channels]
+   * @param {string} [options.audioFilters]
+   * @returns {Promise<Array<string>>}
+   */
+  mergeMedia: async (options) => {
+    const {
+      files,
+      outputFormat = 'mp3',
+      suffix = '_merged',
+      outputDirectory,
+      onProgress,
+      audioCodec = 'auto',
+      audioBitrate,
+      sampleRate,
+      channels,
+      audioFilters
+    } = options;
+
+    if (!Array.isArray(files) || files.length < 2) {
+      throw new Error('Please provide at least two files to merge.');
+    }
+
+    if (!SUPPORTED_AUDIO_FORMATS.includes(outputFormat)) {
+      throw new Error('Unsupported output format for merge.');
+    }
+
+    const normalizedCodec = typeof audioCodec === 'string' ? audioCodec.toLowerCase() : 'auto';
+    const bitrateOption = normalizeBitrate(audioBitrate);
+    const sampleRateOption = toPositiveInteger(sampleRate);
+    const channelOption = toPositiveInteger(channels);
+    const filtersOption = typeof audioFilters === 'string' && audioFilters.trim() !== '' ? audioFilters.trim() : null;
+
+    const firstFile = files[0];
+    const firstExt = path.extname(firstFile) || '';
+    const baseName = path.basename(firstFile, firstExt);
+    const dirName = path.dirname(firstFile);
+    const targetDir = outputDirectory && outputDirectory.trim() !== '' ? outputDirectory : dirName;
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const sanitizedSuffix = typeof suffix === 'string' ? suffix : '';
+    const outputPath = path.join(targetDir, `${baseName}${sanitizedSuffix}.${outputFormat}`);
+
+    const firstExtLower = firstExt.replace('.', '').toLowerCase();
+    const allSameExtension = files.every(file => path.extname(file).toLowerCase() === firstExt.toLowerCase());
+
+    const canStreamCopy = normalizedCodec === 'copy' &&
+      !filtersOption &&
+      !bitrateOption &&
+      !sampleRateOption &&
+      !channelOption &&
+      allSameExtension &&
+      firstExtLower === outputFormat.toLowerCase();
+
+    const results = [];
+
+    if (canStreamCopy) {
+      let tempResources;
+      try {
+        tempResources = createConcatListFile(files);
+        await new Promise((resolve, reject) => {
+          let command = ffmpeg()
+            .input(tempResources.listPath)
+            .inputOptions(['-f', 'concat', '-safe', '0'])
+            .outputOptions('-c copy')
+            .output(outputPath);
+
+          command
+            .on('progress', (progress) => {
+              if (onProgress) {
+                onProgress(outputPath, progress.percent);
+              }
+            })
+            .on('end', () => {
+              results.push(outputPath);
+              resolve();
+            })
+            .on('error', (err) => {
+              reject(new Error(`Error merging media: ${err.message}`));
+            })
+            .run();
+        });
+      } finally {
+        cleanupConcatList(tempResources);
+      }
+    } else {
+      await new Promise((resolve, reject) => {
+        let command = ffmpeg();
+        files.forEach(file => {
+          command = command.input(file);
+        });
+
+        const concatFilter = {
+          filter: 'concat',
+          options: { n: files.length, v: 0, a: 1 },
+          inputs: files.map((_file, index) => `${index}:a`),
+          outputs: 'aout'
+        };
+
+        command = command
+          .complexFilter([concatFilter])
+          .outputOptions('-map', '[aout]')
+          .output(outputPath)
+          .toFormat(outputFormat);
+
+        const codec = normalizedCodec === 'auto' || normalizedCodec === 'copy'
+          ? resolveCodec(outputFormat)
+          : normalizedCodec;
+
+        if (codec) {
+          command = command.audioCodec(codec);
+        }
+        if (bitrateOption) {
+          command = command.audioBitrate(bitrateOption);
+        }
+        if (sampleRateOption) {
+          command = command.audioFrequency(sampleRateOption);
+        }
+        if (channelOption) {
+          command = command.audioChannels(channelOption);
+        }
+        if (filtersOption) {
+          command = command.audioFilters(filtersOption);
+        }
+
+        command
+          .on('progress', (progress) => {
+            if (onProgress) {
+              onProgress(outputPath, progress.percent);
+            }
+          })
+          .on('end', () => {
+            results.push(outputPath);
+            resolve();
+          })
+          .on('error', (err) => {
+            reject(new Error(`Error merging media: ${err.message}`));
           })
           .run();
       });
