@@ -16,7 +16,7 @@
       <button id="btn-convert" class="nav-button">Convert Format</button>
       <button id="btn-extract" class="nav-button">Extract Audio</button>
       <button id="btn-merge" class="nav-button">Merge Media</button>
-      <button id="btn-history" class="nav-button">History</button>
+      <button id="btn-history" class="nav-button">History/Logs</button>
     </nav>
     
     <main class="content">
@@ -380,6 +380,18 @@
         <div id="merge-progress-container" class="hidden">
           <progress id="merge-progress-bar" max="100" value="0"></progress>
           <div id="merge-progress-text">0%</div>
+        </div>
+      </section>
+
+      <section id="section-history" class="section">
+        <h2>History / Logs</h2>
+
+        <div class="input-group">
+          <div id="history-list" class="history-list"></div>
+          <div class="history-footer">
+            <button id="history-clear" type="button">Clear History</button>
+            <small class="history-note">History/Logs stay local to your device and never leave it.</small>
+          </div>
         </div>
       </section>
 
