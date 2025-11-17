@@ -25,6 +25,13 @@ contextBridge.exposeInMainWorld('api', {
       }
     });
   },
+  onExtractProgress: (callback) => {
+    ipcRenderer.on('extract-progress', (_event, data) => {
+      if (typeof callback === 'function') {
+        callback(data);
+      }
+    });
+  },
   
   // Database operations
   savePreset: (preset) => ipcRenderer.invoke('save-preset', preset),

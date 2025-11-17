@@ -143,6 +143,26 @@ ipcMain.handle('convert-format', async (event, options) => {
   }
 });
 
+ipcMain.handle('extract-audio', async (event, options) => {
+  try {
+    const results = await ffmpegService.extractAudio({
+      ...options,
+      onProgress: (file, percent) => {
+        if (mainWindow) {
+          mainWindow.webContents.send('extract-progress', {
+            file,
+            percent: typeof percent === 'number' ? percent : 0
+          });
+        }
+      }
+    });
+    return { success: true, results };
+  } catch (error) {
+    console.error('Error extracting audio:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Add this new IPC handler for directory selection
 ipcMain.handle('select-directory', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {

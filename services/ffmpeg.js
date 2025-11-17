@@ -7,7 +7,7 @@ const ffprobeStatic = require('ffprobe-static');
 
 let configured = false;
 let ffmpegSource = null;
-const SUPPORTED_CONVERSION_FORMATS = ['mp3', 'm4a', 'wav', 'aac'];
+const SUPPORTED_AUDIO_FORMATS = ['mp3', 'm4a', 'wav', 'aac'];
 
 const codecMap = {
   mp3: 'libmp3lame',
@@ -18,6 +18,31 @@ const codecMap = {
 
 function resolveCodec(targetFormat) {
   return codecMap[targetFormat] || null;
+}
+
+function normalizeBitrate(bitrate) {
+  if (bitrate === undefined || bitrate === null) {
+    return null;
+  }
+  const value = String(bitrate).trim();
+  if (!value) {
+    return null;
+  }
+  if (/[a-zA-Z]$/.test(value)) {
+    return value;
+  }
+  return `${value}k`;
+}
+
+function toPositiveInteger(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return Math.floor(parsed);
 }
 
 async function findSystemFfmpeg() {
@@ -156,7 +181,7 @@ const ffmpegService = {
       throw new Error('No files provided for conversion.');
     }
 
-    if (!targetFormat || !SUPPORTED_CONVERSION_FORMATS.includes(targetFormat)) {
+    if (!targetFormat || !SUPPORTED_AUDIO_FORMATS.includes(targetFormat)) {
       throw new Error('Unsupported target format.');
     }
 
@@ -195,6 +220,135 @@ const ffmpegService = {
           })
           .on('error', (err) => {
             reject(new Error(`Error converting ${file}: ${err.message}`));
+          })
+          .run();
+      });
+    }
+
+    return results;
+  },
+  /**
+   * Extract audio segments from media files
+   * @param {Object} options
+   * @param {Array<string>} options.files
+   * @param {string} options.startTime
+   * @param {string} options.duration
+   * @param {string} options.outputFormat
+   * @param {string} [options.suffix]
+   * @param {string|null} [options.outputDirectory]
+   * @param {Function} [options.onProgress]
+   * @returns {Promise<Array<string>>}
+   */
+  extractAudio: async (options) => {
+    const {
+      files,
+      startTime = '00:00:00',
+      duration,
+      outputFormat = 'mp3',
+      suffix = '_extract',
+      outputDirectory,
+      onProgress,
+      audioCodec = 'auto',
+      audioBitrate,
+      sampleRate,
+      channels,
+      audioTrack,
+      audioFilters
+    } = options;
+
+    if (!Array.isArray(files) || files.length === 0) {
+      throw new Error('No files provided for extraction.');
+    }
+
+    if (!duration) {
+      throw new Error('Duration is required for audio extraction.');
+    }
+
+    if (!SUPPORTED_AUDIO_FORMATS.includes(outputFormat)) {
+      throw new Error('Unsupported output format for extraction.');
+    }
+
+    const normalizedCodec = typeof audioCodec === 'string' ? audioCodec.toLowerCase() : 'auto';
+    const bitrateOption = normalizeBitrate(audioBitrate);
+    const sampleRateOption = toPositiveInteger(sampleRate);
+    const channelOption = toPositiveInteger(channels);
+    const filtersOption = typeof audioFilters === 'string' && audioFilters.trim() !== '' ? audioFilters.trim() : null;
+    const mapOption = typeof audioTrack === 'string' && audioTrack.trim() !== '' ? audioTrack.trim() : null;
+
+    const results = [];
+
+    for (const file of files) {
+      const inputExt = path.extname(file);
+      const baseName = path.basename(file, inputExt);
+      const dirName = path.dirname(file);
+      const targetDir = outputDirectory && outputDirectory.trim() !== '' ? outputDirectory : dirName;
+
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      const sanitizedSuffix = typeof suffix === 'string' ? suffix : '';
+      const outputPath = path.join(targetDir, `${baseName}${sanitizedSuffix}.${outputFormat}`);
+
+      await new Promise((resolve, reject) => {
+        const inputFormat = inputExt.replace('.', '').toLowerCase();
+        const targetFormat = outputFormat.toLowerCase();
+        let command = ffmpeg(file)
+          .setStartTime(startTime)
+          .duration(duration)
+          .noVideo()
+          .output(outputPath)
+          .toFormat(outputFormat);
+
+        if (mapOption) {
+          command = command.outputOptions(['-map', mapOption]);
+        }
+
+        const streamCopyRequested = normalizedCodec === 'copy';
+        const streamCopyAllowed = streamCopyRequested &&
+          inputFormat === targetFormat &&
+          !filtersOption &&
+          !bitrateOption &&
+          !sampleRateOption &&
+          !channelOption;
+
+        if (streamCopyRequested && !streamCopyAllowed) {
+          console.warn(`Stream copy requested for ${file} but requirements not met (format mismatch or filters/options present). Falling back to re-encoding.`);
+        }
+
+        if (streamCopyAllowed) {
+          command = command.outputOptions('-c copy');
+        } else {
+          const codec = normalizedCodec === 'auto' ? resolveCodec(targetFormat) : normalizedCodec;
+          if (codec) {
+            command = command.audioCodec(codec);
+          }
+          if (bitrateOption) {
+            command = command.audioBitrate(bitrateOption);
+          }
+          if (sampleRateOption) {
+            command = command.audioFrequency(sampleRateOption);
+          }
+          if (channelOption) {
+            command = command.audioChannels(channelOption);
+          }
+          if (filtersOption) {
+            command = command.audioFilters(filtersOption);
+          }
+        }
+
+        command
+          .on('progress', (progress) => {
+            if (onProgress) {
+              onProgress(file, progress.percent);
+            }
+          })
+          .on('end', () => {
+            results.push(outputPath);
+            resolve();
+          })
+          .on('error', (err) => {
+            reject(new Error(`Error extracting audio from ${file}: ${err.message}`));
           })
           .run();
       });

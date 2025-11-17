@@ -10,6 +10,7 @@ A desktop application for batch audio processing operations, built with Electron
 - **Progress Tracking**: Real-time progress bars and status updates
 - **Multiple Audio Formats**: Support for MP3, M4A, WAV, FLAC, AAC files
 - **Format Conversion**: Convert batches of MP3, M4A, WAV, and AAC files to any of the other supported formats
+- **Audio Extraction**: Extract precise segments from one file or entire folders with start/end timestamps, stream-copy mode, and advanced audio controls
 - **Automatic FFmpeg Handling**: Bundled FFmpeg binaries for easy setup
 - **Cross-platform**: Works on Windows, macOS, and Linux
 
@@ -73,6 +74,17 @@ The application will automatically handle FFmpeg installation. If FFmpeg is not 
 3. Choose the desired target format (MP3, M4A, WAV, or AAC)
 4. Optional: set a custom suffix and destination directory
 5. Click **Start Conversion** to batch-convert the selected files
+
+### Audio Extraction
+
+1. Open the **Extract Audio** tab in the sidebar
+2. Select specific files or load every supported file from a directory
+3. Enter a start time and end time (HH:MM:SS) to define the clip window
+4. Choose the desired output format and suffix (defaults to `_extract`)
+5. (Optional) Configure codec, bitrate, sample rate, channel count, track mapping (`-map`), or provide a custom filter graph
+6. Select **Copy original stream** to use `-c copy` and avoid re-encoding when the container/codec already match
+7. Optionally route clips to a custom directory
+8. Click **Extract Audio** to generate clipped audio segments for all selected inputs
 
 ## Development
 
