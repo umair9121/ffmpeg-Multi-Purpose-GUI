@@ -96,7 +96,7 @@ ipcMain.handle('select-files', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile', 'multiSelections'],
     filters: [
-      { name: 'Audio Files', extensions: ['mp3', 'm4a', 'wav', 'flac', 'aac'] }
+      { name: 'Media Files', extensions: ['mp3', 'm4a', 'wav', 'flac', 'aac', 'mp4'] }
     ]
   });
   
@@ -179,6 +179,16 @@ ipcMain.handle('merge-media', async (event, options) => {
     return { success: true, results };
   } catch (error) {
     console.error('Error merging media:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('probe-media', async (_event, filePath) => {
+  try {
+    const metadata = await ffmpegService.probeMedia(filePath);
+    return { success: true, metadata };
+  } catch (error) {
+    console.error('Error probing media:', error);
     return { success: false, error: error.message };
   }
 });
