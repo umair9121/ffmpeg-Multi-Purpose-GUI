@@ -9,6 +9,7 @@ const ffprobeStatic = require('ffprobe-static');
 let configured = false;
 let ffmpegSource = null;
 const SUPPORTED_AUDIO_FORMATS = ['mp3', 'm4a', 'wav', 'aac'];
+const SUPPORTED_CONVERT_FORMATS = [...SUPPORTED_AUDIO_FORMATS, 'mp4'];
 
 const codecMap = {
   mp3: 'libmp3lame',
@@ -19,6 +20,33 @@ const codecMap = {
 
 function resolveCodec(targetFormat) {
   return codecMap[targetFormat] || null;
+}
+
+function normalizeResolutionInput(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const match = value.trim().match(/^(\d+)\s*x\s*(\d+)$/i);
+    if (!match) {
+      return null;
+    }
+    return {
+      width: Number(match[1]),
+      height: Number(match[2])
+    };
+  }
+
+  if (typeof value === 'object' && value.width && value.height) {
+    const width = Number(value.width);
+    const height = Number(value.height);
+    if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+      return { width: Math.floor(width), height: Math.floor(height) };
+    }
+  }
+
+  return null;
 }
 
 function normalizeBitrate(bitrate) {
@@ -138,6 +166,22 @@ async function ensureFfmpegAvailability() {
   return { available: false, source: null };
 }
 
+function ffprobeFile(filePath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (error, metadata) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(metadata);
+      }
+    });
+  });
+}
+
+function extractStream(metadata, type) {
+  return metadata?.streams?.find(stream => stream.codec_type === type) || null;
+}
+
 const ffmpegService = {
   /**
    * Trim audio or video files
@@ -208,15 +252,29 @@ const ffmpegService = {
    * @returns {Promise<Array<string>>}
    */
   convertFormat: async (options) => {
-    const { files, targetFormat, suffix = '_converted', outputDirectory, onProgress } = options;
+    const {
+      files,
+      targetFormat,
+      suffix = '_converted',
+      outputDirectory,
+      onProgress,
+      videoResolution: rawVideoResolution
+    } = options;
 
     if (!Array.isArray(files) || files.length === 0) {
       throw new Error('No files provided for conversion.');
     }
 
-    if (!targetFormat || !SUPPORTED_AUDIO_FORMATS.includes(targetFormat)) {
+    if (!targetFormat || !SUPPORTED_CONVERT_FORMATS.includes(targetFormat)) {
       throw new Error('Unsupported target format.');
     }
+
+    const normalizedResolution = normalizeResolutionInput(rawVideoResolution);
+    if (rawVideoResolution && !normalizedResolution && targetFormat === 'mp4') {
+      throw new Error('Invalid video resolution. Use the format WIDTHxHEIGHT, e.g., 1920x1080.');
+    }
+
+    const isVideoTarget = targetFormat === 'mp4';
 
     const results = [];
 
@@ -233,12 +291,41 @@ const ffmpegService = {
       const sanitizedSuffix = typeof suffix === 'string' ? suffix : '';
       const outputPath = path.join(targetDir, `${baseName}${sanitizedSuffix}.${targetFormat}`);
 
-      await new Promise((resolve, reject) => {
-        let command = ffmpeg(file).output(outputPath).toFormat(targetFormat);
+      let videoStream = null;
+      let videoInspectionComplete = false;
+      if (isVideoTarget) {
+        try {
+          const metadata = await ffprobeFile(file);
+          videoStream = extractStream(metadata, 'video');
+          videoInspectionComplete = true;
+        } catch (error) {
+          console.warn(`Unable to inspect video metadata for ${file}:`, error.message);
+        }
+      }
 
-        const codec = resolveCodec(targetFormat);
-        if (codec) {
-          command = command.audioCodec(codec);
+      await new Promise((resolve, reject) => {
+        let command = ffmpeg(file)
+          .output(outputPath)
+          .toFormat(targetFormat);
+
+        if (isVideoTarget) {
+          if (videoStream) {
+            command = command.videoCodec('libx264');
+            if (normalizedResolution) {
+              const { width, height } = normalizedResolution;
+              command = command.videoFilters(`scale=${width}:${height}`);
+            }
+          } else if (videoInspectionComplete) {
+            command = command.noVideo();
+          }
+
+          command = command.audioCodec('aac');
+        } else {
+          command = command.noVideo();
+          const codec = resolveCodec(targetFormat);
+          if (codec) {
+            command = command.audioCodec(codec);
+          }
         }
 
         command
@@ -573,7 +660,38 @@ const ffmpegService = {
     }
   },
   
-  // Add more FFmpeg operations here: convert, extract audio, merge, etc.
+  probeMedia: async (filePath) => {
+    if (!filePath || typeof filePath !== 'string') {
+      throw new Error('A valid file path is required to probe media.');
+    }
+
+    const metadata = await ffprobeFile(filePath);
+    const videoStream = extractStream(metadata, 'video');
+    const audioStream = extractStream(metadata, 'audio');
+
+    return {
+      format: metadata?.format?.format_name || null,
+      duration: metadata?.format?.duration ? Number(metadata.format.duration) : null,
+      bitrate: metadata?.format?.bit_rate ? Number(metadata.format.bit_rate) : null,
+      size: metadata?.format?.size ? Number(metadata.format.size) : null,
+      video: videoStream
+        ? {
+            width: videoStream.width || null,
+            height: videoStream.height || null,
+            codec: videoStream.codec_name || null,
+            frameRate: videoStream.avg_frame_rate || videoStream.r_frame_rate || null
+          }
+        : null,
+      audio: audioStream
+        ? {
+            codec: audioStream.codec_name || null,
+            channels: audioStream.channels || null,
+            sampleRate: audioStream.sample_rate ? Number(audioStream.sample_rate) : null,
+            bitrate: audioStream.bit_rate ? Number(audioStream.bit_rate) : null
+          }
+        : null
+    };
+  }
 };
 
 module.exports = {
