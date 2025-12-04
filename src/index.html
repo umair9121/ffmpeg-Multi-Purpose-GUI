@@ -163,6 +163,21 @@
         </div>
 
         <div class="input-group">
+          <label for="convert-video-compression-mode">Video Compression:</label>
+          <div class="resolution-info">
+            <span id="convert-original-bitrate">Original bitrate: --</span>
+          </div>
+          <select id="convert-video-compression-mode">
+            <option value="source" selected>Keep original bitrate</option>
+            <option value="percentage">Compress by percentage</option>
+            <option value="custom">Custom bitrate</option>
+          </select>
+          <input type="number" id="convert-compression-percentage" class="hidden" min="1" max="500" placeholder="e.g. 50 for 50%">
+          <input type="text" id="convert-custom-bitrate" class="hidden" placeholder="e.g. 4500k or 5M">
+          <small class="helper-text">Percentage uses the detected bitrate (e.g., 50 means 50% of the original). Custom bitrate accepts values such as 4500k or 5M.</small>
+        </div>
+
+        <div class="input-group">
           <label for="convert-output-suffix">Output Filename Suffix:</label>
           <input type="text" id="convert-output-suffix" value="_converted">
         </div>
