@@ -258,7 +258,8 @@ const ffmpegService = {
       suffix = '_converted',
       outputDirectory,
       onProgress,
-      videoResolution: rawVideoResolution
+      videoResolution: rawVideoResolution,
+      videoBitrate: rawVideoBitrate
     } = options;
 
     if (!Array.isArray(files) || files.length === 0) {
@@ -272,6 +273,11 @@ const ffmpegService = {
     const normalizedResolution = normalizeResolutionInput(rawVideoResolution);
     if (rawVideoResolution && !normalizedResolution && targetFormat === 'mp4') {
       throw new Error('Invalid video resolution. Use the format WIDTHxHEIGHT, e.g., 1920x1080.');
+    }
+
+    const videoBitrateOption = normalizeBitrate(rawVideoBitrate);
+    if (rawVideoBitrate && !videoBitrateOption && targetFormat === 'mp4') {
+      throw new Error('Invalid video bitrate value.');
     }
 
     const isVideoTarget = targetFormat === 'mp4';
@@ -314,6 +320,9 @@ const ffmpegService = {
             if (normalizedResolution) {
               const { width, height } = normalizedResolution;
               command = command.videoFilters(`scale=${width}:${height}`);
+            }
+            if (videoBitrateOption) {
+              command = command.videoBitrate(videoBitrateOption);
             }
           } else if (videoInspectionComplete) {
             command = command.noVideo();
