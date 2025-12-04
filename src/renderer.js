@@ -29,6 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const convertOriginalResolutionText = document.getElementById('convert-original-resolution');
   const convertResolutionModeSelect = document.getElementById('convert-resolution-mode');
   const convertCustomResolutionInput = document.getElementById('convert-custom-resolution');
+  const convertOriginalBitrateText = document.getElementById('convert-original-bitrate');
+  const convertVideoCompressionModeSelect = document.getElementById('convert-video-compression-mode');
+  const convertCompressionPercentageInput = document.getElementById('convert-compression-percentage');
+  const convertCustomBitrateInput = document.getElementById('convert-custom-bitrate');
 
   // Extract section elements
   const extractSelectFilesBtn = document.getElementById('extract-select-files');
@@ -187,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let extractCustomOutputPath = '';
   let mergeCustomOutputPath = '';
   let convertDetectedResolution = null;
+  let convertDetectedBitrate = null;
   let convertResolutionRequestId = 0;
 
   // Listen for trim progress updates from the main process
@@ -945,6 +950,57 @@ document.addEventListener('DOMContentLoaded', () => {
     return typeof filePath === 'string' && filePath.trim().toLowerCase().endsWith('.mp4');
   }
 
+  function formatBitrateValue(value, suffix) {
+    if (!Number.isFinite(value) || value <= 0) {
+      return null;
+    }
+    const normalized = Number(value.toFixed(3));
+    const text = Number.isInteger(normalized) ? String(normalized) : normalized.toString().replace(/\.?0+$/, '');
+    return `${text}${suffix}`;
+  }
+
+  function normalizeVideoBitrateInput(value) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const match = trimmed.match(/^(\d+(?:\.\d+)?)(?:\s*(kbps|mbps|k|m))?$/i);
+    if (!match) {
+      return null;
+    }
+
+    const amount = Number(match[1]);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return null;
+    }
+
+    const unit = (match[2] || 'k').toLowerCase();
+    if (unit === 'k' || unit === 'kbps') {
+      return formatBitrateValue(amount, 'k');
+    }
+    if (unit === 'm' || unit === 'mbps') {
+      return formatBitrateValue(amount, 'M');
+    }
+
+    return formatBitrateValue(amount, 'k');
+  }
+
+  function formatBitrateDisplay(bitsPerSecond) {
+    if (!Number.isFinite(bitsPerSecond) || bitsPerSecond <= 0) {
+      return '--';
+    }
+    const megabits = bitsPerSecond / 1_000_000;
+    if (megabits >= 1) {
+      return `${megabits.toFixed(megabits >= 10 ? 1 : 2)} Mbps`;
+    }
+    const kilobits = bitsPerSecond / 1_000;
+    return `${kilobits.toFixed(kilobits >= 10 ? 1 : 2)} kbps`;
+  }
+
   function updateConvertResolutionInputVisibility() {
     if (!convertResolutionModeSelect || !convertCustomResolutionInput) {
       return;
@@ -960,28 +1016,45 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function refreshConvertResolutionInfo() {
-    if (!convertOriginalResolutionText) {
+    if (!convertOriginalResolutionText && !convertOriginalBitrateText) {
       return;
     }
 
     convertDetectedResolution = null;
+    convertDetectedBitrate = null;
 
     const videoFile = convertSelectedFiles.find(file => isMp4File(file));
     if (!videoFile) {
-      convertOriginalResolutionText.textContent = 'Original: --';
+      if (convertOriginalResolutionText) {
+        convertOriginalResolutionText.textContent = 'Original: --';
+      }
+      if (convertOriginalBitrateText) {
+        convertOriginalBitrateText.textContent = 'Original bitrate: --';
+      }
       if (convertResolutionModeSelect) {
         convertResolutionModeSelect.value = 'source';
       }
       updateConvertResolutionInputVisibility();
+      updateConvertCompressionInputs();
       return;
     }
 
     if (!window.api || typeof window.api.probeMedia !== 'function') {
-      convertOriginalResolutionText.textContent = 'Original: --';
+      if (convertOriginalResolutionText) {
+        convertOriginalResolutionText.textContent = 'Original: --';
+      }
+      if (convertOriginalBitrateText) {
+        convertOriginalBitrateText.textContent = 'Original bitrate: --';
+      }
       return;
     }
 
-    convertOriginalResolutionText.textContent = 'Original: Detecting...';
+    if (convertOriginalResolutionText) {
+      convertOriginalResolutionText.textContent = 'Original: Detecting...';
+    }
+    if (convertOriginalBitrateText) {
+      convertOriginalBitrateText.textContent = 'Original bitrate: Detecting...';
+    }
     const requestId = ++convertResolutionRequestId;
 
     try {
@@ -995,29 +1068,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const width = response.metadata?.video?.width;
       const height = response.metadata?.video?.height;
+      const formatBitrate = Number(response.metadata?.bitrate);
+      const videoBitrate = Number(response.metadata?.video?.bitrate);
+      const detectedBitrate = Number.isFinite(videoBitrate) && videoBitrate > 0
+        ? videoBitrate
+        : (Number.isFinite(formatBitrate) && formatBitrate > 0 ? formatBitrate : null);
 
       if (width && height) {
         convertDetectedResolution = { width, height };
-        convertOriginalResolutionText.textContent = `Original: ${width}x${height}`;
+        if (convertOriginalResolutionText) {
+          convertOriginalResolutionText.textContent = `Original: ${width}x${height}`;
+        }
         if (convertResolutionModeSelect?.value === 'custom' && convertCustomResolutionInput && !convertCustomResolutionInput.value.trim()) {
           convertCustomResolutionInput.value = `${width}x${height}`;
         }
       } else {
-        convertOriginalResolutionText.textContent = 'Original: Not available';
+        if (convertOriginalResolutionText) {
+          convertOriginalResolutionText.textContent = 'Original: Not available';
+        }
+      }
+
+      if (detectedBitrate) {
+        convertDetectedBitrate = detectedBitrate;
+        if (convertOriginalBitrateText) {
+          convertOriginalBitrateText.textContent = `Original bitrate: ${formatBitrateDisplay(detectedBitrate)}`;
+        }
+      } else if (convertOriginalBitrateText) {
+        convertOriginalBitrateText.textContent = 'Original bitrate: Not available';
       }
     } catch (error) {
       if (requestId === convertResolutionRequestId) {
-        convertOriginalResolutionText.textContent = 'Original: Detection failed';
+        if (convertOriginalResolutionText) {
+          convertOriginalResolutionText.textContent = 'Original: Detection failed';
+        }
+        if (convertOriginalBitrateText) {
+          convertOriginalBitrateText.textContent = 'Original bitrate: Detection failed';
+        }
       }
       console.error('Error detecting media resolution:', error);
     }
 
     updateConvertResolutionInputVisibility();
+    updateConvertCompressionInputs();
   }
 
   if (convertResolutionModeSelect) {
     convertResolutionModeSelect.addEventListener('change', updateConvertResolutionInputVisibility);
     updateConvertResolutionInputVisibility();
+  }
+
+  function updateConvertCompressionInputs() {
+    if (!convertVideoCompressionModeSelect) {
+      return;
+    }
+    const mode = convertVideoCompressionModeSelect.value;
+    if (convertCompressionPercentageInput) {
+      if (mode === 'percentage') {
+        convertCompressionPercentageInput.classList.remove('hidden');
+      } else {
+        convertCompressionPercentageInput.classList.add('hidden');
+      }
+    }
+    if (convertCustomBitrateInput) {
+      if (mode === 'custom') {
+        convertCustomBitrateInput.classList.remove('hidden');
+      } else {
+        convertCustomBitrateInput.classList.add('hidden');
+      }
+    }
+  }
+
+  if (convertVideoCompressionModeSelect) {
+    convertVideoCompressionModeSelect.addEventListener('change', updateConvertCompressionInputs);
+    updateConvertCompressionInputs();
   }
   
   // Process all files in the selected directory
@@ -1123,6 +1246,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const resolutionMode = convertResolutionModeSelect ? convertResolutionModeSelect.value : 'source';
       let videoResolution = null;
+      let videoBitrate = null;
+
       if (targetFormat === 'mp4' && resolutionMode === 'custom') {
         const resolutionInputValue = convertCustomResolutionInput ? convertCustomResolutionInput.value.trim() : '';
         const parsedResolution = parseResolutionInput(resolutionInputValue);
@@ -1131,6 +1256,33 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
         videoResolution = `${parsedResolution.width}x${parsedResolution.height}`;
+      }
+
+      if (targetFormat === 'mp4') {
+        const compressionMode = convertVideoCompressionModeSelect ? convertVideoCompressionModeSelect.value : 'source';
+        if (compressionMode === 'custom') {
+          const customInputValue = convertCustomBitrateInput ? convertCustomBitrateInput.value : '';
+          const normalizedBitrate = normalizeVideoBitrateInput(customInputValue);
+          if (!normalizedBitrate) {
+            alert('Please provide a valid custom video bitrate (examples: 4500k, 5M, 4000).');
+            return;
+          }
+          videoBitrate = normalizedBitrate;
+        } else if (compressionMode === 'percentage') {
+          const percentageRaw = convertCompressionPercentageInput ? convertCompressionPercentageInput.value : '';
+          const percentageValue = Number(percentageRaw);
+          if (!Number.isFinite(percentageValue) || percentageValue <= 0) {
+            alert('Please provide a valid compression percentage greater than 0.');
+            return;
+          }
+          if (!convertDetectedBitrate) {
+            alert('Original bitrate could not be detected. Please select a custom bitrate instead.');
+            return;
+          }
+          const targetBitsPerSecond = Math.max(1000, Math.floor(convertDetectedBitrate * (percentageValue / 100)));
+          const targetKilobits = Math.max(1, Math.round(targetBitsPerSecond / 1000));
+          videoBitrate = `${targetKilobits}k`;
+        }
       }
 
       if (convertProgressContainer) {
@@ -1145,7 +1297,8 @@ document.addEventListener('DOMContentLoaded', () => {
           targetFormat,
           suffix,
           outputDirectory: useCustomOutput ? convertCustomOutputPath : null,
-          videoResolution
+          videoResolution,
+          videoBitrate
         });
 
         if (!response?.success) {
