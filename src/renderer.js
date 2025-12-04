@@ -26,6 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const convertCustomOutputSelector = document.getElementById('convert-custom-output-selector');
   const convertSelectOutputDirectoryBtn = document.getElementById('convert-select-output-directory');
   const convertCustomOutputPathInput = document.getElementById('convert-custom-output-path');
+  const convertOriginalResolutionText = document.getElementById('convert-original-resolution');
+  const convertResolutionModeSelect = document.getElementById('convert-resolution-mode');
+  const convertCustomResolutionInput = document.getElementById('convert-custom-resolution');
 
   // Extract section elements
   const extractSelectFilesBtn = document.getElementById('extract-select-files');
@@ -183,6 +186,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let extractDirectoryPath = '';
   let extractCustomOutputPath = '';
   let mergeCustomOutputPath = '';
+  let convertDetectedResolution = null;
+  let convertResolutionRequestId = 0;
 
   // Listen for trim progress updates from the main process
   if (window.api && typeof window.api.onTrimProgress === 'function') {
@@ -611,8 +616,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     convertSelectedFilesContainer.appendChild(list);
+    refreshConvertResolutionInfo();
   }
   displayConvertSelectedFiles();
+  refreshConvertResolutionInfo();
 
   function displayExtractSelectedFiles() {
     if (!extractSelectedFilesContainer) {
@@ -736,6 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('convert-filter-mp3').checked) extensions.push('.mp3');
     if (document.getElementById('convert-filter-wav').checked) extensions.push('.wav');
     if (document.getElementById('convert-filter-aac').checked) extensions.push('.aac');
+    if (document.getElementById('convert-filter-mp4').checked) extensions.push('.mp4');
     return extensions;
   }
 
@@ -918,6 +926,99 @@ document.addEventListener('DOMContentLoaded', () => {
     const parts = [hours, minutes, remainingSeconds].map(part => String(part).padStart(2, '0'));
     return parts.join(':');
   }
+
+  function parseResolutionInput(value) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const match = value.trim().match(/^(\d+)\s*x\s*(\d+)$/i);
+    if (!match) {
+      return null;
+    }
+    return {
+      width: Number(match[1]),
+      height: Number(match[2])
+    };
+  }
+
+  function isMp4File(filePath) {
+    return typeof filePath === 'string' && filePath.trim().toLowerCase().endsWith('.mp4');
+  }
+
+  function updateConvertResolutionInputVisibility() {
+    if (!convertResolutionModeSelect || !convertCustomResolutionInput) {
+      return;
+    }
+    if (convertResolutionModeSelect.value === 'custom') {
+      convertCustomResolutionInput.classList.remove('hidden');
+      if (!convertCustomResolutionInput.value.trim() && convertDetectedResolution) {
+        convertCustomResolutionInput.value = `${convertDetectedResolution.width}x${convertDetectedResolution.height}`;
+      }
+    } else {
+      convertCustomResolutionInput.classList.add('hidden');
+    }
+  }
+
+  async function refreshConvertResolutionInfo() {
+    if (!convertOriginalResolutionText) {
+      return;
+    }
+
+    convertDetectedResolution = null;
+
+    const videoFile = convertSelectedFiles.find(file => isMp4File(file));
+    if (!videoFile) {
+      convertOriginalResolutionText.textContent = 'Original: --';
+      if (convertResolutionModeSelect) {
+        convertResolutionModeSelect.value = 'source';
+      }
+      updateConvertResolutionInputVisibility();
+      return;
+    }
+
+    if (!window.api || typeof window.api.probeMedia !== 'function') {
+      convertOriginalResolutionText.textContent = 'Original: --';
+      return;
+    }
+
+    convertOriginalResolutionText.textContent = 'Original: Detecting...';
+    const requestId = ++convertResolutionRequestId;
+
+    try {
+      const response = await window.api.probeMedia(videoFile);
+      if (requestId !== convertResolutionRequestId) {
+        return;
+      }
+      if (!response?.success) {
+        throw new Error(response?.error || 'Unknown probe error');
+      }
+
+      const width = response.metadata?.video?.width;
+      const height = response.metadata?.video?.height;
+
+      if (width && height) {
+        convertDetectedResolution = { width, height };
+        convertOriginalResolutionText.textContent = `Original: ${width}x${height}`;
+        if (convertResolutionModeSelect?.value === 'custom' && convertCustomResolutionInput && !convertCustomResolutionInput.value.trim()) {
+          convertCustomResolutionInput.value = `${width}x${height}`;
+        }
+      } else {
+        convertOriginalResolutionText.textContent = 'Original: Not available';
+      }
+    } catch (error) {
+      if (requestId === convertResolutionRequestId) {
+        convertOriginalResolutionText.textContent = 'Original: Detection failed';
+      }
+      console.error('Error detecting media resolution:', error);
+    }
+
+    updateConvertResolutionInputVisibility();
+  }
+
+  if (convertResolutionModeSelect) {
+    convertResolutionModeSelect.addEventListener('change', updateConvertResolutionInputVisibility);
+    updateConvertResolutionInputVisibility();
+  }
   
   // Process all files in the selected directory
   processDirectoryBtn.addEventListener('click', async () => {
@@ -1020,6 +1121,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      const resolutionMode = convertResolutionModeSelect ? convertResolutionModeSelect.value : 'source';
+      let videoResolution = null;
+      if (targetFormat === 'mp4' && resolutionMode === 'custom') {
+        const resolutionInputValue = convertCustomResolutionInput ? convertCustomResolutionInput.value.trim() : '';
+        const parsedResolution = parseResolutionInput(resolutionInputValue);
+        if (!parsedResolution) {
+          alert('Please enter a valid custom resolution in the format WIDTHxHEIGHT, e.g., 1280x720.');
+          return;
+        }
+        videoResolution = `${parsedResolution.width}x${parsedResolution.height}`;
+      }
+
       if (convertProgressContainer) {
         convertProgressContainer.classList.remove('hidden');
         convertProgressBar.value = 0;
@@ -1031,7 +1144,8 @@ document.addEventListener('DOMContentLoaded', () => {
           files: convertSelectedFiles,
           targetFormat,
           suffix,
-          outputDirectory: useCustomOutput ? convertCustomOutputPath : null
+          outputDirectory: useCustomOutput ? convertCustomOutputPath : null,
+          videoResolution
         });
 
         if (!response?.success) {
