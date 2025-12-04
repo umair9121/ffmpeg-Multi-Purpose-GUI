@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('api', {
   convertFormat: (options) => ipcRenderer.invoke('convert-format', options),
   extractAudio: (options) => ipcRenderer.invoke('extract-audio', options),
   mergeMedia: (options) => ipcRenderer.invoke('merge-media', options),
+  probeMedia: (filePath) => ipcRenderer.invoke('probe-media', filePath),
   onTrimProgress: (callback) => {
     ipcRenderer.on('trim-progress', (_event, data) => {
       if (typeof callback === 'function') {
