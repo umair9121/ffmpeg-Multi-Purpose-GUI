@@ -133,6 +133,7 @@
             <label><input type="checkbox" id="convert-filter-m4a" checked> .m4a</label>
             <label><input type="checkbox" id="convert-filter-wav" checked> .wav</label>
             <label><input type="checkbox" id="convert-filter-aac" checked> .aac</label>
+            <label><input type="checkbox" id="convert-filter-mp4" checked> .mp4</label>
           </div>
           <div id="convert-selected-files" class="file-list"></div>
         </div>
@@ -144,7 +145,21 @@
             <option value="m4a">M4A (.m4a)</option>
             <option value="wav">WAV (.wav)</option>
             <option value="aac">AAC (.aac)</option>
+            <option value="mp4">MP4 (.mp4)</option>
           </select>
+        </div>
+
+        <div class="input-group">
+          <label for="convert-resolution-mode">Resolution:</label>
+          <div class="resolution-info">
+            <span id="convert-original-resolution">Original: --</span>
+          </div>
+          <select id="convert-resolution-mode">
+            <option value="source" selected>Keep original</option>
+            <option value="custom">Custom</option>
+          </select>
+          <input type="text" id="convert-custom-resolution" class="hidden" placeholder="e.g. 1920x1080">
+          <small class="helper-text">Resolution applies to MP4 conversions. Original values are detected from the first video file.</small>
         </div>
 
         <div class="input-group">
